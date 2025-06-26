@@ -99,15 +99,35 @@ st.markdown("""
     
     /* Streamlit components */
     .stSelectbox > div > div > div {
-        background-color: #2a2a2a;
-        color: #ffffff;
-        border: 1px solid #535353;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
+    }
+    
+    .stSelectbox > div > div > div > div {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    .stSelectbox input {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     .stMultiSelect > div > div > div {
-        background-color: #2a2a2a;
-        color: #ffffff;
-        border: 1px solid #535353;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
+    }
+    
+    .stMultiSelect > div > div > div > div {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    .stMultiSelect input {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     /* Buttons */
@@ -145,20 +165,38 @@ st.markdown("""
     
     /* Improve multiselect styling */
     .stMultiSelect > div > div {
-        background-color: #2a2a2a;
-        border: 1px solid #535353;
-        border-radius: 8px;
+        background-color: #2a2a2a !important;
+        border: 1px solid #535353 !important;
+        border-radius: 8px !important;
     }
     
     .stMultiSelect span {
-        color: #ffffff;
+        color: #ffffff !important;
+    }
+    
+    .stMultiSelect [data-baseweb="tag"] {
+        background-color: #1db954 !important;
+        color: #ffffff !important;
+    }
+    
+    .stMultiSelect [data-baseweb="tag"] span {
+        color: #ffffff !important;
     }
     
     /* Date input */
     .stDateInput > div > div > input {
-        background-color: #2a2a2a;
-        color: #ffffff;
-        border: 1px solid #535353;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
+    }
+    
+    .stDateInput > div > div {
+        background-color: #2a2a2a !important;
+    }
+    
+    .stDateInput input {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     /* Expander */
@@ -247,6 +285,102 @@ st.markdown("""
     
     /* Plotly chart text */
     .js-plotly-plot .plotly .legendtext {
+        fill: #ffffff !important;
+    }
+    
+    /* Dropdown menus and options */
+    [data-baseweb="select"] {
+        background-color: #2a2a2a !important;
+    }
+    
+    [data-baseweb="select"] > div {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
+    }
+    
+    [data-baseweb="popover"] {
+        background-color: #2a2a2a !important;
+    }
+    
+    [data-baseweb="menu"] {
+        background-color: #2a2a2a !important;
+    }
+    
+    [data-baseweb="menu"] li {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    [data-baseweb="menu"] li:hover {
+        background-color: #1db954 !important;
+        color: #ffffff !important;
+    }
+    
+    /* Additional form controls */
+    .stSelectbox [data-testid="stSelectbox"] > div > div {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    .stMultiSelect [data-testid="stMultiSelect"] > div > div {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    /* Input fields */
+    input {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
+    }
+    
+    /* Text areas */
+    textarea {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
+    }
+    
+    /* Force all white backgrounds to dark */
+    div[style*="background-color: white"], 
+    div[style*="background-color: #ffffff"],
+    div[style*="background-color: #FFFFFF"] {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    /* React Select components */
+    .css-26l3qy-menu {
+        background-color: #2a2a2a !important;
+    }
+    
+    .css-1pahdxg-control {
+        background-color: #2a2a2a !important;
+        border: 1px solid #535353 !important;
+    }
+    
+    .css-1hwfws3 {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    /* Additional Streamlit overrides */
+    .stSelectbox > div > div[data-baseweb="select"] {
+        background-color: #2a2a2a !important;
+    }
+    
+    .stSelectbox > div > div[data-baseweb="select"] > div {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    /* Ensure dropdown arrows are visible */
+    .stSelectbox svg {
+        fill: #ffffff !important;
+    }
+    
+    .stMultiSelect svg {
         fill: #ffffff !important;
     }
 </style>
