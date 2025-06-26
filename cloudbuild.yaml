@@ -1,0 +1,36 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # Step 1: Build the Docker image with the latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', '-t',
+      'us-central1-docker.pkg.dev/decoded-jigsaw-341521/github-fun-spotify/fun-spotify-dashboard:latest',
+      '.'
+    ]
+
+  # Step 2: Push the latest tag to the Google Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/decoded-jigsaw-341521/github-fun-spotify/fun-spotify-dashboard:latest']
+
+  # Step 3: Deploy the latest tag to Google Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Deploy to Cloud Run
+        gcloud run deploy fun-spotify-dashboard \
+          --image us-central1-docker.pkg.dev/decoded-jigsaw-341521/github-fun-spotify/fun-spotify-dashboard:latest \
+          --region us-central1 \
+          --platform managed \
+          --allow-unauthenticated \
+          --timeout 3600 \
+          --memory 2Gi \
+          --max-instances 10 \
+          --concurrency 10 \
+          --cpu 2
+
+images:
+  - 'us-central1-docker.pkg.dev/decoded-jigsaw-341521/github-fun-spotify/fun-spotify-dashboard:latest' 

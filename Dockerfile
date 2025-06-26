@@ -1,40 +1,33 @@
-# Use Python 3.9 slim image for smaller size
 FROM python:3.9-slim
 
-# Set working directory
+# Set the working directory
 WORKDIR /app
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+# Copy application files
+COPY . /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    software-properties-common \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first (for better caching)
-COPY requirements.txt .
-
-# Install Python dependencies
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY spotify_dashboard.py .
-COPY raw_data/ ./raw_data/
-
-# Expose port
+# Expose the application port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK CMD curl --fail http://localhost:8080/_stcore/health
+# Create .streamlit directory and config
+RUN mkdir -p /app/.streamlit
 
-# Run streamlit
-CMD streamlit run spotify_dashboard.py \
-    --server.port=8080 \
-    --server.address=0.0.0.0 \
-    --server.headless=true \
-    --server.fileWatcherType=none \
-    --browser.gatherUsageStats=false 
+# Create Streamlit config file
+RUN echo '\
+[server]\n\
+port = 8080\n\
+address = "0.0.0.0"\n\
+headless = true\n\
+enableCORS = false\n\
+enableXsrfProtection = false\n\
+maxUploadSize = 200\n\
+\n\
+[browser]\n\
+gatherUsageStats = false\n\
+' > /app/.streamlit/config.toml
+
+# Command to run the Streamlit app
+CMD ["streamlit", "run", "spotify_dashboard.py", "--server.port=8080", "--server.address=0.0.0.0"] 

@@ -48,6 +48,11 @@ def load_spotify_data():
     
     all_data = []
     
+    # If no JSON files found, create sample data for demo
+    if not json_files:
+        st.warning("No Spotify data files found. Generating sample data for demonstration purposes.")
+        return create_sample_data()
+    
     with st.spinner("Loading Spotify data..."):
         for file in json_files:
             with open(file, 'r', encoding='utf-8') as f:
