@@ -827,18 +827,23 @@ def main():
         
         st.sidebar.subheader("📅 Date Range")
         
+        # Get available years from the data
+        available_years = sorted(df['year'].unique(), reverse=True)
+        year_options = [f"{year}" for year in available_years]
+        
         # Quick date range presets
+        preset_options = [
+            "All Time",
+            "Last Year", 
+            "Last 6 Months",
+            "Last 3 Months", 
+            "Last Month",
+            "This Year"
+        ] + year_options + ["Custom Range"]
+        
         preset_range = st.sidebar.selectbox(
             "Quick Select",
-            options=[
-                "All Time",
-                "Last Year", 
-                "Last 6 Months",
-                "Last 3 Months", 
-                "Last Month",
-                "This Year",
-                "Custom Range"
-            ],
+            options=preset_options,
             index=0
         )
         
@@ -863,6 +868,12 @@ def main():
         elif preset_range == "This Year":
             default_start = max(min_date, current_year_start)
             default_end = max_date
+        elif preset_range.isdigit():  # Individual year selection
+            selected_year = int(preset_range)
+            year_start = pd.Timestamp(selected_year, 1, 1).date()
+            year_end = pd.Timestamp(selected_year, 12, 31).date()
+            default_start = max(min_date, year_start)
+            default_end = min(max_date, year_end)
         else:  # Custom Range
             default_start, default_end = min_date, max_date
         
