@@ -18,7 +18,7 @@ st.set_page_config(
     page_title="Spotify Listening History Dashboard",
     page_icon="🎵",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Custom CSS for Spotify-like styling
@@ -36,9 +36,9 @@ st.markdown("""
         background-color: #121212;
     }
     
-    /* Sidebar styling */
+    /* Remove sidebar */
     .css-1d391kg {
-        background-color: #000000;
+        display: none;
     }
     
     /* Metric cards */
@@ -48,6 +48,48 @@ st.markdown("""
         border-radius: 0.5rem;
         border-left: 4px solid #1db954;
         color: #ffffff;
+    }
+    
+    /* Fix metric label colors */
+    .stMetric > div > div > div > div {
+        color: #ffffff !important;
+    }
+    
+    .stMetric > div > div > div > div > div {
+        color: #ffffff !important;
+    }
+    
+    .stMetric label {
+        color: #ffffff !important;
+        font-weight: bold !important;
+    }
+    
+    .stMetric > div > div > div {
+        background-color: #181818 !important;
+        border-radius: 10px !important;
+        padding: 1rem !important;
+        border: 1px solid #535353 !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* Metric values */
+    .stMetric > div > div > div > div[data-testid="metric-value"] {
+        color: #1db954 !important;
+        font-weight: bold !important;
+        font-size: 2rem !important;
+    }
+    
+    /* Metric labels */
+    .stMetric > div > div > div > div[data-testid="metric-label"] {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Metric delta */
+    .stMetric > div > div > div > div[data-testid="metric-delta"] {
+        color: #1ed760 !important;
+        font-size: 0.8rem !important;
     }
     
     /* Headers and text */
@@ -81,15 +123,25 @@ st.markdown("""
         background-color: #1ed760;
     }
     
-    /* Sidebar elements */
-    .stSidebar > div {
-        background-color: #000000;
+    /* Filter section styling */
+    .filter-container {
+        background-color: #181818;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border: 1px solid #535353;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
     
-    .stSidebar .stSelectbox > div > div > div {
+    /* Improve multiselect styling */
+    .stMultiSelect > div > div {
         background-color: #2a2a2a;
-        color: #ffffff;
         border: 1px solid #535353;
+        border-radius: 8px;
+    }
+    
+    .stMultiSelect span {
+        color: #ffffff;
     }
     
     /* Date input */
@@ -999,80 +1051,107 @@ def create_time_based_analysis(df):
 def main():
     # Header
     st.title("🎵 Spotify Listening History Dashboard")
-    st.markdown("---")
     
     # Load data
     try:
         df = load_spotify_data()
         st.success(f"Successfully loaded {len(df):,} listening records from {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
         
-        # Sidebar filters
-        st.sidebar.header("🎛️ Filters")
+        # Top filters section with custom styling
+        st.markdown("""
+        <div style="background-color: #181818; padding: 1.5rem; border-radius: 10px; 
+                   border: 1px solid #535353; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
+        """, unsafe_allow_html=True)
         
-        # Enhanced date range filter
-        min_date = df['date'].min()
-        max_date = df['date'].max()
+        st.markdown("### 🎛️ Filters")
         
-        st.sidebar.subheader("📅 Date Range")
-        
-        # Get available years from the data
-        available_years = sorted(df['year'].unique(), reverse=True)
-        year_options = [f"{year}" for year in available_years]
-        
-        # Quick date range presets
-        preset_options = [
-            "All Time",
-            "Last Year", 
-            "Last 6 Months",
-            "Last 3 Months", 
-            "Last Month",
-            "This Year"
-        ] + year_options + ["Custom Range"]
-        
-        preset_range = st.sidebar.selectbox(
-            "Quick Select",
-            options=preset_options,
-            index=0
-        )
-        
-        # Calculate preset date ranges
-        today = pd.Timestamp.now().date()
-        current_year_start = pd.Timestamp(today.year, 1, 1).date()
-        
-        if preset_range == "All Time":
-            default_start, default_end = min_date, max_date
-        elif preset_range == "Last Year":
-            default_start = max(min_date, today - pd.Timedelta(days=365))
-            default_end = max_date
-        elif preset_range == "Last 6 Months":
-            default_start = max(min_date, today - pd.Timedelta(days=180))
-            default_end = max_date
-        elif preset_range == "Last 3 Months":
-            default_start = max(min_date, today - pd.Timedelta(days=90))
-            default_end = max_date
-        elif preset_range == "Last Month":
-            default_start = max(min_date, today - pd.Timedelta(days=30))
-            default_end = max_date
-        elif preset_range == "This Year":
-            default_start = max(min_date, current_year_start)
-            default_end = max_date
-        elif preset_range.isdigit():  # Individual year selection
-            selected_year = int(preset_range)
-            year_start = pd.Timestamp(selected_year, 1, 1).date()
-            year_end = pd.Timestamp(selected_year, 12, 31).date()
-            default_start = max(min_date, year_start)
-            default_end = min(max_date, year_end)
-        else:  # Custom Range
-            default_start, default_end = min_date, max_date
-        
-        # Custom date range selector (always shown but populated based on preset)
-        date_range = st.sidebar.date_input(
-            "Select Custom Date Range" if preset_range == "Custom Range" else "Selected Range",
-            value=(default_start, default_end),
-            min_value=min_date,
-            max_value=max_date,
-            disabled=(preset_range != "Custom Range")
-        )
+        # Create filter container
+        with st.container():
+            # Enhanced date range filter
+            min_date = df['date'].min()
+            max_date = df['date'].max()
+            
+            # Get available years from the data
+            available_years = sorted(df['year'].unique(), reverse=True)
+            year_options = [f"{year}" for year in available_years]
+            
+            # Quick date range presets
+            preset_options = [
+                "All Time",
+                "Last Year", 
+                "Last 6 Months",
+                "Last 3 Months", 
+                "Last Month",
+                "This Year"
+            ] + year_options + ["Custom Range"]
+            
+            # Date range controls in columns
+            col1, col2, col3 = st.columns([2, 3, 2])
+            
+            with col1:
+                preset_range = st.selectbox(
+                    "📅 Quick Select",
+                    options=preset_options,
+                    index=0,
+                    key="main_preset_range"
+                )
+            
+            # Calculate preset date ranges
+            today = pd.Timestamp.now().date()
+            current_year_start = pd.Timestamp(today.year, 1, 1).date()
+            
+            if preset_range == "All Time":
+                default_start, default_end = min_date, max_date
+            elif preset_range == "Last Year":
+                default_start = max(min_date, today - pd.Timedelta(days=365))
+                default_end = max_date
+            elif preset_range == "Last 6 Months":
+                default_start = max(min_date, today - pd.Timedelta(days=180))
+                default_end = max_date
+            elif preset_range == "Last 3 Months":
+                default_start = max(min_date, today - pd.Timedelta(days=90))
+                default_end = max_date
+            elif preset_range == "Last Month":
+                default_start = max(min_date, today - pd.Timedelta(days=30))
+                default_end = max_date
+            elif preset_range == "This Year":
+                default_start = max(min_date, current_year_start)
+                default_end = max_date
+            elif preset_range.isdigit():  # Individual year selection
+                selected_year = int(preset_range)
+                year_start = pd.Timestamp(selected_year, 1, 1).date()
+                year_end = pd.Timestamp(selected_year, 12, 31).date()
+                default_start = max(min_date, year_start)
+                default_end = min(max_date, year_end)
+            else:  # Custom Range
+                default_start, default_end = min_date, max_date
+            
+            with col2:
+                # Custom date range selector (always shown but populated based on preset)
+                date_range = st.date_input(
+                    "📆 Custom Date Range" if preset_range == "Custom Range" else "📆 Selected Range",
+                    value=(default_start, default_end),
+                    min_value=min_date,
+                    max_value=max_date,
+                    disabled=(preset_range != "Custom Range"),
+                    key="main_date_range"
+                )
+            
+            with col3:
+                # Show selected date range info
+                if len(date_range) == 2:
+                    total_days = (date_range[1] - date_range[0]).days + 1
+                    st.info(f"📊 **{total_days} days** selected\n\n{date_range[0]} to {date_range[1]}")
+            
+            # Artist filter in a separate row
+            st.markdown("##### 🎤 Artist Filter")
+            top_artists = df['artist_name'].value_counts().head(20).index.tolist()
+            selected_artists = st.multiselect(
+                "Filter by Top Artists (optional)",
+                top_artists,
+                key="main_artist_filter",
+                help="Select one or more artists to focus your analysis"
+            )
         
         # Filter data based on date range
         if len(date_range) == 2:
@@ -1081,20 +1160,14 @@ def main():
         else:
             df_filtered = df
         
-        # Show selected date range info
-        if len(date_range) == 2:
-            total_days = (date_range[1] - date_range[0]).days + 1
-            st.sidebar.info(f"📊 Selected: {total_days} days\n({date_range[0]} to {date_range[1]})")
-        
-        # Artist filter
-        top_artists = df['artist_name'].value_counts().head(20).index.tolist()
-        selected_artists = st.sidebar.multiselect(
-            "Filter by Top Artists (optional)",
-            top_artists
-        )
-        
+        # Apply artist filter
         if selected_artists:
             df_filtered = df_filtered[df_filtered['artist_name'].isin(selected_artists)]
+        
+        # Close the filter container
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("---")
         
         # Display overview metrics
         create_overview_metrics(df_filtered)
