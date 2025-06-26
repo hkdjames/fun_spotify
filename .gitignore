@@ -27,14 +27,17 @@ wheels/
 *.egg
 
 # Spotify Raw Data (potentially contains personal information)
-raw_data/
-*.json
+# Commented out to allow data files for deployment
+# raw_data/
+# *.json
 
-# Credentials and sensitive files
-*.json
+# Exclude specific sensitive files but allow Spotify data
 creds.json
 credentials.json
 client_secret.json
+
+# Additional credentials and sensitive files
+# *.json (commented out to allow Spotify data files)
 
 # IDE
 .vscode/
