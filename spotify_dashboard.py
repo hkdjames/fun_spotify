@@ -48,10 +48,11 @@ def load_spotify_data():
     
     all_data = []
     
-    # If no JSON files found, create sample data for demo
+    # Check if JSON files exist
     if not json_files:
-        st.warning("No Spotify data files found. Generating sample data for demonstration purposes.")
-        return create_sample_data()
+        st.error("No Spotify data files found in the 'raw_data' directory.")
+        st.info("Please upload your Spotify Extended Streaming History JSON files (Streaming_History_Audio_*.json)")
+        st.stop()
     
     with st.spinner("Loading Spotify data..."):
         for file in json_files:
