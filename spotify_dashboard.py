@@ -21,21 +21,112 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS for Spotify-like styling
 st.markdown("""
 <style>
+    /* Main app background */
+    .stApp {
+        background-color: #121212;
+        color: #ffffff;
+    }
+    
+    /* Main content area */
     .main > div {
         padding-top: 2rem;
+        background-color: #121212;
     }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background-color: #000000;
+    }
+    
+    /* Metric cards */
     .metric-card {
-        background-color: #f0f2f6;
+        background-color: #181818;
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 4px solid #1db954;
+        color: #ffffff;
     }
+    
+    /* Headers and text */
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+    }
+    
+    /* Streamlit components */
     .stSelectbox > div > div > div {
-        background-color: #191414;
-        color: white;
+        background-color: #2a2a2a;
+        color: #ffffff;
+        border: 1px solid #535353;
+    }
+    
+    .stMultiSelect > div > div > div {
+        background-color: #2a2a2a;
+        color: #ffffff;
+        border: 1px solid #535353;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        background-color: #1db954;
+        color: #ffffff;
+        border: none;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+    
+    .stButton > button:hover {
+        background-color: #1ed760;
+    }
+    
+    /* Sidebar elements */
+    .stSidebar > div {
+        background-color: #000000;
+    }
+    
+    .stSidebar .stSelectbox > div > div > div {
+        background-color: #2a2a2a;
+        color: #ffffff;
+        border: 1px solid #535353;
+    }
+    
+    /* Date input */
+    .stDateInput > div > div > input {
+        background-color: #2a2a2a;
+        color: #ffffff;
+        border: 1px solid #535353;
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        background-color: #181818;
+        color: #ffffff;
+        border: 1px solid #535353;
+    }
+    
+    /* Success/Info messages */
+    .stSuccess {
+        background-color: #1db954;
+        color: #ffffff;
+    }
+    
+    .stInfo {
+        background-color: #2a2a2a;
+        color: #ffffff;
+        border-left: 4px solid #1db954;
+    }
+    
+    /* Dataframe */
+    .stDataFrame {
+        background-color: #181818;
+        color: #ffffff;
+    }
+    
+    /* Checkbox */
+    .stCheckbox > label {
+        color: #ffffff;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -156,14 +247,19 @@ def create_listening_timeline(df):
             x='date', 
             y='hours_played',
             title=title,
-            labels={'hours_played': 'Hours Played', 'date': x_label}
+            labels={'hours_played': 'Hours Played', 'date': x_label},
+            color_discrete_sequence=['#1db954']
         )
         
         fig.update_layout(
             showlegend=False,
             height=400,
             xaxis_title=x_label,
-            yaxis_title="Hours Played"
+            yaxis_title="Hours Played",
+            plot_bgcolor='#121212',
+            paper_bgcolor='#121212',
+            font_color='#ffffff',
+            title_font_color='#ffffff'
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -182,9 +278,17 @@ def create_top_artists_tracks(df):
             y=top_artists.index,
             orientation='h',
             title="Top 15 Artists by Listening Time",
-            labels={'x': 'Hours Played', 'y': 'Artist'}
+            labels={'x': 'Hours Played', 'y': 'Artist'},
+            color_discrete_sequence=['#1db954']
         )
-        fig.update_layout(height=500, yaxis={'categoryorder': 'total ascending'})
+        fig.update_layout(
+            height=500, 
+            yaxis={'categoryorder': 'total ascending'},
+            plot_bgcolor='#121212',
+            paper_bgcolor='#121212',
+            font_color='#ffffff',
+            title_font_color='#ffffff'
+        )
         st.plotly_chart(fig, use_container_width=True)
         
         # Collapsible scrollable list for top 500 artists
@@ -233,9 +337,17 @@ def create_top_artists_tracks(df):
             y=top_tracks.index,
             orientation='h',
             title="Top 15 Tracks by Listening Time",
-            labels={'x': 'Hours Played', 'y': 'Track - Artist'}
+            labels={'x': 'Hours Played', 'y': 'Track - Artist'},
+            color_discrete_sequence=['#1ed760']
         )
-        fig.update_layout(height=500, yaxis={'categoryorder': 'total ascending'})
+        fig.update_layout(
+            height=500, 
+            yaxis={'categoryorder': 'total ascending'},
+            plot_bgcolor='#121212',
+            paper_bgcolor='#121212',
+            font_color='#ffffff',
+            title_font_color='#ffffff'
+        )
         st.plotly_chart(fig, use_container_width=True)
         
         # Collapsible scrollable list for top 500 tracks
@@ -308,9 +420,16 @@ def create_listening_patterns(df):
                 x=hourly_listening.index,
                 y=hourly_listening.values,
                 title="Listening Activity by Hour of Day",
-                labels={'x': 'Hour of Day', 'y': 'Hours Played'}
+                labels={'x': 'Hour of Day', 'y': 'Hours Played'},
+                color_discrete_sequence=['#1db954']
             )
-            fig.update_layout(height=400)
+            fig.update_layout(
+                height=400,
+                plot_bgcolor='#121212',
+                paper_bgcolor='#121212',
+                font_color='#ffffff',
+                title_font_color='#ffffff'
+            )
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
@@ -322,9 +441,16 @@ def create_listening_patterns(df):
                 x=daily_listening.index,
                 y=daily_listening.values,
                 title="Listening Activity by Day of Week",
-                labels={'x': 'Day of Week', 'y': 'Hours Played'}
+                labels={'x': 'Day of Week', 'y': 'Hours Played'},
+                color_discrete_sequence=['#1ed760']
             )
-            fig.update_layout(height=400)
+            fig.update_layout(
+                height=400,
+                plot_bgcolor='#121212',
+                paper_bgcolor='#121212',
+                font_color='#ffffff',
+                title_font_color='#ffffff'
+            )
             st.plotly_chart(fig, use_container_width=True)
     
     elif pattern_view == "Heatmap":
@@ -341,9 +467,15 @@ def create_listening_patterns(df):
             heatmap_pivot,
             title="Listening Activity Heatmap (Day vs Hour)",
             labels={'x': 'Hour of Day', 'y': 'Day of Week', 'color': 'Hours Played'},
-            color_continuous_scale='Viridis'
+            color_continuous_scale=[[0, '#121212'], [0.5, '#1db954'], [1, '#1ed760']]
         )
-        fig.update_layout(height=500)
+        fig.update_layout(
+            height=500,
+            plot_bgcolor='#121212',
+            paper_bgcolor='#121212',
+            font_color='#ffffff',
+            title_font_color='#ffffff'
+        )
         st.plotly_chart(fig, use_container_width=True)
     
     else:  # Monthly Patterns
@@ -359,9 +491,16 @@ def create_listening_patterns(df):
                 x=monthly_listening.index,
                 y=monthly_listening.values,
                 title="Listening Activity by Month",
-                labels={'x': 'Month', 'y': 'Hours Played'}
+                labels={'x': 'Month', 'y': 'Hours Played'},
+                color_discrete_sequence=['#1db954']
             )
-            fig.update_layout(height=400)
+            fig.update_layout(
+                height=400,
+                plot_bgcolor='#121212',
+                paper_bgcolor='#121212',
+                font_color='#ffffff',
+                title_font_color='#ffffff'
+            )
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
         
@@ -376,9 +515,16 @@ def create_listening_patterns(df):
                 y='hours_played',
                 color='year',
                 title="Monthly Listening by Year",
-                labels={'hours_played': 'Hours Played', 'month': 'Month'}
+                labels={'hours_played': 'Hours Played', 'month': 'Month'},
+                color_discrete_sequence=['#1db954', '#1ed760', '#ff6b35', '#f7931e', '#c13584']
             )
-            fig.update_layout(height=400)
+            fig.update_layout(
+                height=400,
+                plot_bgcolor='#121212',
+                paper_bgcolor='#121212',
+                font_color='#ffffff',
+                title_font_color='#ffffff'
+            )
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
 
@@ -397,7 +543,14 @@ def create_discovery_analysis(df):
         x=discoveries_by_year.index,
         y=discoveries_by_year.values,
         title="New Tracks Discovered by Year",
-        labels={'x': 'Year', 'y': 'New Tracks Discovered'}
+        labels={'x': 'Year', 'y': 'New Tracks Discovered'},
+        color_discrete_sequence=['#1db954']
+    )
+    fig.update_layout(
+        plot_bgcolor='#121212',
+        paper_bgcolor='#121212',
+        font_color='#ffffff',
+        title_font_color='#ffffff'
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -423,9 +576,17 @@ def create_skip_analysis(df):
             y=top_skip_artists.index,
             orientation='h',
             title="Artists with Highest Skip Rates (10+ plays)",
-            labels={'x': 'Skip Rate (%)', 'y': 'Artist'}
+            labels={'x': 'Skip Rate (%)', 'y': 'Artist'},
+            color_discrete_sequence=['#ff6b35']
         )
-        fig.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
+        fig.update_layout(
+            height=400, 
+            yaxis={'categoryorder': 'total ascending'},
+            plot_bgcolor='#121212',
+            paper_bgcolor='#121212',
+            font_color='#ffffff',
+            title_font_color='#ffffff'
+        )
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
@@ -466,9 +627,16 @@ def create_skip_analysis(df):
             x='time_period',
             y='skip_rate',
             title=title,
-            labels={'skip_rate': 'Skip Rate (%)', 'time_period': 'Date'}
+            labels={'skip_rate': 'Skip Rate (%)', 'time_period': 'Date'},
+            color_discrete_sequence=['#ff6b35']
         )
-        fig.update_layout(height=400)
+        fig.update_layout(
+            height=400,
+            plot_bgcolor='#121212',
+            paper_bgcolor='#121212',
+            font_color='#ffffff',
+            title_font_color='#ffffff'
+        )
         st.plotly_chart(fig, use_container_width=True)
 
 def create_stacked_area_charts(df):
@@ -576,15 +744,19 @@ def create_stacked_area_charts(df):
     # Create 100% stacked area chart
     fig = go.Figure()
     
-    # Define colors - use a mix of qualitative palettes for better distinction
-    colors = (px.colors.qualitative.Set3 + 
-             px.colors.qualitative.Pastel + 
-             px.colors.qualitative.Set2)
+    # Define Spotify-inspired colors
+    spotify_colors = [
+        '#1db954', '#1ed760', '#ff6b35', '#f7931e', '#c13584',
+        '#00d4ff', '#ff9500', '#8b5a3c', '#6a994e', '#bc4749',
+        '#577590', '#f8961e', '#90e0ef', '#ffd166', '#06ffa5',
+        '#ff006e', '#8338ec', '#3a86ff', '#06ffa5', '#fb8500'
+    ]
+    colors = spotify_colors * 10  # Repeat colors if needed
     
     # Add traces for each artist/track (in reverse order for proper stacking and legend display)
     for i, item in enumerate(reversed(column_order)):
         # Use gray for "Other" category
-        color = "#CCCCCC" if item == "Other" else colors[i % len(colors)]
+        color = "#535353" if item == "Other" else colors[i % len(colors)]
         
         fig.add_trace(go.Scatter(
             x=pivot_data_pct.index,
@@ -608,13 +780,19 @@ def create_stacked_area_charts(df):
         yaxis_title="Percentage of Listening Time (%)",
         height=500,
         hovermode='x unified',
+        plot_bgcolor='#121212',
+        paper_bgcolor='#121212',
+        font_color='#ffffff',
+        title_font_color='#ffffff',
         legend=dict(
             orientation="v",
             yanchor="top",
             y=1,
             xanchor="left",
             x=1.02,
-            traceorder="normal"  # This will show legend in the order we added traces
+            traceorder="normal",  # This will show legend in the order we added traces
+            bgcolor='rgba(0,0,0,0)',
+            font_color='#ffffff'
         ),
         yaxis=dict(
             range=[0, 100],
@@ -699,22 +877,25 @@ def create_artist_wordcloud(df):
             frequencies[clean_artist] = float(value)
         
         if frequencies:
-            # Create word cloud using frequencies
+            # Create word cloud using frequencies with Spotify colors
             wordcloud = WordCloud(
                 width=800, 
                 height=400, 
-                background_color='white',
-                colormap='viridis',
+                background_color='#121212',
+                colormap='Greens',
                 max_words=max_artists,
                 relative_scaling=0.5,
-                min_font_size=8
+                min_font_size=8,
+                prefer_horizontal=0.8,
+                color_func=lambda *args, **kwargs: '#1db954'
             ).generate_from_frequencies(frequencies)
             
-            # Display using matplotlib
-            fig, ax = plt.subplots(figsize=(12, 6))
+            # Display using matplotlib with dark background
+            fig, ax = plt.subplots(figsize=(12, 6), facecolor='#121212')
             ax.imshow(wordcloud, interpolation='bilinear')
             ax.axis('off')
-            ax.set_title(subtitle, fontsize=14, pad=20)
+            ax.set_title(subtitle, fontsize=14, pad=20, color='#ffffff')
+            ax.set_facecolor('#121212')
             st.pyplot(fig)
             
             # Show top 10 in text format below
@@ -785,21 +966,28 @@ def create_time_based_analysis(df):
         )
         
         fig.add_trace(
-            go.Bar(x=time_stats.index, y=time_stats['Total Hours'], name='Total Hours'),
+            go.Bar(x=time_stats.index, y=time_stats['Total Hours'], name='Total Hours', marker_color='#1db954'),
             row=1, col=1
         )
         
         fig.add_trace(
-            go.Bar(x=time_stats.index, y=time_stats['Total Plays'], name='Total Plays'),
+            go.Bar(x=time_stats.index, y=time_stats['Total Plays'], name='Total Plays', marker_color='#1ed760'),
             row=1, col=2
         )
         
         fig.add_trace(
-            go.Bar(x=time_stats.index, y=time_stats['Unique Artists'], name='Unique Artists'),
+            go.Bar(x=time_stats.index, y=time_stats['Unique Artists'], name='Unique Artists', marker_color='#ff6b35'),
             row=1, col=3
         )
         
-        fig.update_layout(height=400, showlegend=False)
+        fig.update_layout(
+            height=400, 
+            showlegend=False,
+            plot_bgcolor='#121212',
+            paper_bgcolor='#121212',
+            font_color='#ffffff',
+            title_font_color='#ffffff'
+        )
         fig.update_xaxes(title_text=x_title)
         
         # Rotate x-axis labels if needed
