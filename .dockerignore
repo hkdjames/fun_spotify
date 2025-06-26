@@ -1,0 +1,41 @@
+# Virtual environments
+spotify_venv/
+venv/
+env/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Test files
+test.py
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp 
