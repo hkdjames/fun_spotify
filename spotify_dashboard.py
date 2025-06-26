@@ -133,6 +133,16 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
     
+    /* Sticky filter section */
+    .sticky-filters {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background-color: #121212;
+        padding: 1rem 0;
+        border-bottom: 2px solid #1db954;
+    }
+    
     /* Improve multiselect styling */
     .stMultiSelect > div > div {
         background-color: #2a2a2a;
@@ -161,13 +171,25 @@ st.markdown("""
     /* Success/Info messages */
     .stSuccess {
         background-color: #1db954;
-        color: #ffffff;
+        color: #ffffff !important;
+    }
+    
+    .stSuccess > div {
+        color: #ffffff !important;
     }
     
     .stInfo {
         background-color: #2a2a2a;
-        color: #ffffff;
+        color: #ffffff !important;
         border-left: 4px solid #1db954;
+    }
+    
+    .stInfo > div {
+        color: #ffffff !important;
+    }
+    
+    .stInfo p, .stInfo div, .stInfo span {
+        color: #ffffff !important;
     }
     
     /* Dataframe */
@@ -179,6 +201,53 @@ st.markdown("""
     /* Checkbox */
     .stCheckbox > label {
         color: #ffffff;
+    }
+    
+    /* Additional text color fixes */
+    p, div, span, label {
+        color: #ffffff;
+    }
+    
+    /* Date input labels and text */
+    .stDateInput label {
+        color: #ffffff !important;
+    }
+    
+    .stDateInput > div > label {
+        color: #ffffff !important;
+    }
+    
+    /* Selectbox labels */
+    .stSelectbox label {
+        color: #ffffff !important;
+    }
+    
+    .stSelectbox > div > label {
+        color: #ffffff !important;
+    }
+    
+    /* Multiselect labels */
+    .stMultiSelect label {
+        color: #ffffff !important;
+    }
+    
+    .stMultiSelect > div > label {
+        color: #ffffff !important;
+    }
+    
+    /* All text elements */
+    .stMarkdown, .stMarkdown p, .stMarkdown div {
+        color: #ffffff !important;
+    }
+    
+    /* Chart legends and labels - force white text */
+    .legend text {
+        fill: #ffffff !important;
+    }
+    
+    /* Plotly chart text */
+    .js-plotly-plot .plotly .legendtext {
+        fill: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -575,7 +644,11 @@ def create_listening_patterns(df):
                 plot_bgcolor='#121212',
                 paper_bgcolor='#121212',
                 font_color='#ffffff',
-                title_font_color='#ffffff'
+                title_font_color='#ffffff',
+                legend=dict(
+                    bgcolor='rgba(0,0,0,0)',
+                    font_color='#ffffff'
+                )
             )
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
@@ -1057,10 +1130,11 @@ def main():
         df = load_spotify_data()
         st.success(f"Successfully loaded {len(df):,} listening records from {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
         
-        # Top filters section with custom styling
+        # Top filters section with sticky styling
         st.markdown("""
+        <div class="sticky-filters">
         <div style="background-color: #181818; padding: 1.5rem; border-radius: 10px; 
-                   border: 1px solid #535353; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
+                   border: 1px solid #535353; margin-bottom: 1rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
         """, unsafe_allow_html=True)
         
         st.markdown("### 🎛️ Filters")
@@ -1165,7 +1239,7 @@ def main():
             df_filtered = df_filtered[df_filtered['artist_name'].isin(selected_artists)]
         
         # Close the filter container
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
         
         st.markdown("---")
         
