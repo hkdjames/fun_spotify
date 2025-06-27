@@ -97,37 +97,53 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* Streamlit components - Light backgrounds with dark text */
+    /* Streamlit components - Dark backgrounds with light text for CLOSED dropdowns */
+    .stSelectbox, .stSelectbox div, .stSelectbox span, .stSelectbox p {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
     .stSelectbox > div > div > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
     }
     
     .stSelectbox > div > div > div > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     .stSelectbox input {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    .stMultiSelect, .stMultiSelect div, .stMultiSelect span, .stMultiSelect p {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     .stMultiSelect > div > div > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
     }
     
     .stMultiSelect > div > div > div > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     .stMultiSelect input {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    /* Keep selected tags green */
+    .stMultiSelect [data-baseweb="tag"], .stMultiSelect [data-baseweb="tag"] * {
+        background-color: #1db954 !important;
+        color: #ffffff !important;
     }
     
     /* Buttons */
@@ -165,13 +181,13 @@ st.markdown("""
     
     /* Improve multiselect styling */
     .stMultiSelect > div > div {
-        background-color: #ffffff !important;
-        border: 1px solid #cccccc !important;
+        background-color: #2a2a2a !important;
+        border: 1px solid #535353 !important;
         border-radius: 8px !important;
     }
     
     .stMultiSelect span {
-        color: #000000 !important;
+        color: #ffffff !important;
     }
     
     .stMultiSelect [data-baseweb="tag"] {
@@ -183,20 +199,25 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* Date input */
+    /* Date input - Dark theme to match dropdowns */
+    .stDateInput, .stDateInput div, .stDateInput span, .stDateInput p {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
     .stDateInput > div > div > input {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
     }
     
     .stDateInput > div > div {
-        background-color: #ffffff !important;
+        background-color: #2a2a2a !important;
     }
     
     .stDateInput input {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     /* Expander */
@@ -241,35 +262,15 @@ st.markdown("""
         color: #ffffff;
     }
     
-    /* Additional text color fixes */
-    p, div, span, label {
+    /* Additional text color fixes - exclude form controls */
+    p:not(.stSelectbox p):not(.stMultiSelect p):not(.stDateInput p), 
+    div:not(.stSelectbox div):not(.stMultiSelect div):not(.stDateInput div), 
+    span:not(.stSelectbox span):not(.stMultiSelect span):not(.stDateInput span) {
         color: #ffffff;
     }
     
-    /* Date input labels and text */
-    .stDateInput label {
-        color: #ffffff !important;
-    }
-    
-    .stDateInput > div > label {
-        color: #ffffff !important;
-    }
-    
-    /* Selectbox labels */
-    .stSelectbox label {
-        color: #ffffff !important;
-    }
-    
-    .stSelectbox > div > label {
-        color: #ffffff !important;
-    }
-    
-    /* Multiselect labels */
-    .stMultiSelect label {
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect > div > label {
+    /* Form labels should be white (above the controls) */
+    .stDateInput > label, .stSelectbox > label, .stMultiSelect > label {
         color: #ffffff !important;
     }
     
@@ -288,9 +289,10 @@ st.markdown("""
         fill: #ffffff !important;
     }
     
-    /* Dropdown menus and options */
-    [data-baseweb="select"] {
+    /* Dropdown menus and options - COMPREHENSIVE */
+    [data-baseweb="select"], [data-baseweb="select"] * {
         background-color: #ffffff !important;
+        color: #000000 !important;
     }
     
     [data-baseweb="select"] > div {
@@ -299,81 +301,159 @@ st.markdown("""
         border: 1px solid #cccccc !important;
     }
     
-    [data-baseweb="popover"] {
-        background-color: #ffffff !important;
-    }
-    
-    [data-baseweb="menu"] {
-        background-color: #ffffff !important;
-    }
-    
-    [data-baseweb="menu"] li {
+    [data-baseweb="popover"], [data-baseweb="popover"] * {
         background-color: #ffffff !important;
         color: #000000 !important;
     }
     
-    [data-baseweb="menu"] li:hover {
+    [data-baseweb="menu"], [data-baseweb="menu"] * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    [data-baseweb="menu"] li, [data-baseweb="menu"] li * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    [data-baseweb="menu"] li:hover, [data-baseweb="menu"] li:hover * {
+        background-color: #1db954 !important;
+        color: #ffffff !important;
+    }
+    
+    /* Streamlit dropdown options */
+    ul[role="listbox"], ul[role="listbox"] * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    ul[role="listbox"] li, ul[role="listbox"] li * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    ul[role="listbox"] li:hover, ul[role="listbox"] li:hover * {
+        background-color: #1db954 !important;
+        color: #ffffff !important;
+    }
+    
+    /* Additional dropdown menu selectors */
+    .stSelectbox ul, .stSelectbox ul * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    .stSelectbox li, .stSelectbox li * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    .stSelectbox li:hover, .stSelectbox li:hover * {
+        background-color: #1db954 !important;
+        color: #ffffff !important;
+    }
+    
+    .stMultiSelect ul, .stMultiSelect ul * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    .stMultiSelect li, .stMultiSelect li * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    .stMultiSelect li:hover, .stMultiSelect li:hover * {
         background-color: #1db954 !important;
         color: #ffffff !important;
     }
     
     /* Additional form controls */
     .stSelectbox [data-testid="stSelectbox"] > div > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     .stMultiSelect [data-testid="stMultiSelect"] > div > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     /* Input fields */
     input {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
     }
     
     /* Text areas */
     textarea {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
     }
     
     /* React Select components */
-    .css-26l3qy-menu {
+    .css-26l3qy-menu, .css-26l3qy-menu * {
         background-color: #ffffff !important;
+        color: #000000 !important;
     }
     
-    .css-1pahdxg-control {
-        background-color: #ffffff !important;
-        border: 1px solid #cccccc !important;
+    .css-1pahdxg-control, .css-1pahdxg-control * {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #535353 !important;
     }
     
-    .css-1hwfws3 {
+    .css-1hwfws3, .css-1hwfws3 * {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    
+    /* Any CSS class that contains 'menu' or 'option' */
+    [class*="menu"], [class*="menu"] * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    [class*="option"], [class*="option"] * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    [class*="listbox"], [class*="listbox"] * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    /* Dropdown portal content (rendered outside component tree) */
+    div[role="presentation"], div[role="presentation"] * {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    div[data-floating-ui-portal], div[data-floating-ui-portal] * {
         background-color: #ffffff !important;
         color: #000000 !important;
     }
     
     /* Additional Streamlit overrides */
     .stSelectbox > div > div[data-baseweb="select"] {
-        background-color: #ffffff !important;
+        background-color: #2a2a2a !important;
     }
     
     .stSelectbox > div > div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
     }
     
     /* Ensure dropdown arrows are visible */
     .stSelectbox svg {
-        fill: #000000 !important;
+        fill: #ffffff !important;
     }
     
     .stMultiSelect svg {
-        fill: #000000 !important;
+        fill: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
