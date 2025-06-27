@@ -4,6 +4,13 @@ An interactive dashboard built with Streamlit to visualize and analyze your Spot
 
 ## Features
 
+### 🤖 AI-Powered Chat Analysis (NEW!)
+- **Conversational Data Analysis**: Ask questions about your music data in natural language
+- **Smart Visualizations**: AI generates custom charts and insights on demand
+- **Context-Aware**: Understands your current filters and data scope
+- **Real-time Code Execution**: Generates and runs Python/Plotly code to answer your questions
+- **Example queries**: "What's my most played song?", "Show my listening patterns by hour", "How has my music taste changed?"
+
 ### 📊 Overview Metrics
 - Total listening hours
 - Total plays
@@ -18,9 +25,10 @@ An interactive dashboard built with Streamlit to visualize and analyze your Spot
 - **Music Discovery**: Track when you discovered new music
 - **Skip Analysis**: Analyze your skipping behavior and preferences
 - **Artist Word Cloud**: Visual representation of your most-played artists
+- **Stacked Area Charts**: Timeline view of your top artists/tracks over time
 
 ### 🎛️ Interactive Filters
-- Date range selection
+- Date range selection with quick presets (Last Year, Last 6 Months, etc.)
 - Year filtering
 - Top artists filtering
 - Real-time data updates based on selections
@@ -49,7 +57,30 @@ pip install -r requirements.txt
 2. Wait for Spotify to send you your data (usually takes a few days)
 3. Extract the ZIP file and place all `Streaming_History_Audio_*.json` files in the `raw_data/` folder
 
-### 4. Run the Dashboard
+### 4. Setup AI Chat (Optional)
+To enable the AI-powered conversational analysis:
+
+1. **Get a Gemini API Key** (free with generous limits):
+   - Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - Sign in with your Google account
+   - Click "Create API Key"
+   - Copy your API key
+
+2. **Configure the API Key**:
+   
+   **For Local Development:**
+   - Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml`
+   - Replace `your-gemini-api-key-here` with your actual API key
+   
+   **For Streamlit Cloud Deployment:**
+   - Go to your app settings in Streamlit Cloud
+   - Navigate to "Secrets"
+   - Add: `GEMINI_API_KEY = "your-api-key-here"`
+
+3. **Manual Setup (Testing):**
+   - The dashboard also allows manual API key entry through the sidebar interface
+
+### 5. Run the Dashboard
 ```bash
 streamlit run spotify_dashboard.py
 ```
@@ -109,6 +140,14 @@ The dashboard expects JSON files with the following structure:
 - Artist names sized by play count
 - Beautiful, colorful display
 
+### 🤖 AI Chat Features
+- **Natural Language Queries**: Ask questions like "What's my top artist this year?"
+- **Dynamic Visualizations**: AI creates custom charts based on your questions
+- **Data Context Awareness**: Understands your current filters and time periods
+- **Conversation Memory**: Maintains context throughout your analysis session
+- **Code Generation**: Shows the Python code it generates for transparency
+- **Error Handling**: Graceful handling of complex queries and edge cases
+
 ## Tips for Best Results
 
 1. **Large Datasets**: The dashboard uses caching to handle large datasets efficiently
@@ -122,6 +161,11 @@ The dashboard expects JSON files with the following structure:
 1. **File Not Found**: Ensure all JSON files are in the `raw_data/` directory
 2. **Memory Issues**: If you have a very large dataset, try filtering by year or date range
 3. **Slow Loading**: Large datasets may take a moment to load initially (cached after first load)
+4. **AI Chat Not Working**: 
+   - Check that your Gemini API key is correctly configured
+   - Verify you have internet connection for API calls
+   - Try the manual API key entry option in the sidebar
+5. **AI Code Errors**: The AI generates code dynamically; some complex queries may need refinement
 
 ### Data Requirements
 - JSON files must be named `Streaming_History_Audio_*.json`
@@ -136,9 +180,24 @@ The dashboard is highly customizable. You can:
 - Adjust filtering options
 - Change the layout and styling
 
-## Privacy
+## Privacy & Security
 
-All data processing happens locally on your machine. No data is sent to external servers.
+### Data Processing
+- All core dashboard features process data locally on your machine
+- No personal data is sent to external servers for the main dashboard functionality
+
+### AI Chat Feature
+- **Data Summaries Only**: The AI chat sends only statistical summaries and metadata (not raw listening data)
+- **No Personal Details**: Track names, artist names, and listening patterns are aggregated before sending
+- **API Security**: Uses Google's Gemini API with industry-standard security practices
+- **Optional Feature**: AI chat can be completely disabled if preferred
+- **Code Transparency**: All generated code is visible before execution
+
+### What Data is Shared (AI Chat Only)
+- Summary statistics (total hours, play counts, top artists)
+- Dataframe structure and column information
+- Aggregated insights (no individual track plays)
+- **Never shared**: Raw timestamps, detailed listening history, personal identifiers
 
 ---
 

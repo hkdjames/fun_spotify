@@ -12,451 +12,314 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from collections import Counter
 import seaborn as sns
+import google.generativeai as genai
+import re
+import traceback
 
 # Set page config
 st.set_page_config(
     page_title="Spotify Listening History Dashboard",
     page_icon="🎵",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Spotify-like styling
-st.markdown("""
-<style>
-    /* Main app background */
-    .stApp {
-        background-color: #121212;
-        color: #ffffff;
-    }
-    
-    /* Main content area */
-    .main > div {
-        padding-top: 2rem;
-        background-color: #121212;
-    }
-    
-    /* Remove sidebar */
-    .css-1d391kg {
-        display: none;
-    }
-    
-    /* Metric cards */
-    .metric-card {
-        background-color: #181818;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1db954;
-        color: #ffffff;
-    }
-    
-    /* Fix metric label colors */
-    .stMetric > div > div > div > div {
-        color: #ffffff !important;
-    }
-    
-    .stMetric > div > div > div > div > div {
-        color: #ffffff !important;
-    }
-    
-    .stMetric label {
-        color: #ffffff !important;
-        font-weight: bold !important;
-    }
-    
-    .stMetric > div > div > div {
-        background-color: #181818 !important;
-        border-radius: 10px !important;
-        padding: 1rem !important;
-        border: 1px solid #535353 !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
-    }
-    
-    /* Metric values */
-    .stMetric > div > div > div > div[data-testid="metric-value"] {
-        color: #1db954 !important;
-        font-weight: bold !important;
-        font-size: 2rem !important;
-    }
-    
-    /* Metric labels */
-    .stMetric > div > div > div > div[data-testid="metric-label"] {
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-    }
-    
-    /* Metric delta */
-    .stMetric > div > div > div > div[data-testid="metric-delta"] {
-        color: #1ed760 !important;
-        font-size: 0.8rem !important;
-    }
-    
-    /* Headers and text */
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-    }
-    
-    /* Streamlit components - Dark backgrounds with light text for CLOSED dropdowns */
-    .stSelectbox, .stSelectbox div, .stSelectbox span, .stSelectbox p {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    .stSelectbox > div > div > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border: 1px solid #535353 !important;
-    }
-    
-    .stSelectbox > div > div > div > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    .stSelectbox input {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect, .stMultiSelect div, .stMultiSelect span, .stMultiSelect p {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect > div > div > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border: 1px solid #535353 !important;
-    }
-    
-    .stMultiSelect > div > div > div > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect input {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    /* Keep selected tags green */
-    .stMultiSelect [data-baseweb="tag"], .stMultiSelect [data-baseweb="tag"] * {
-        background-color: #1db954 !important;
-        color: #ffffff !important;
-    }
-    
-    /* Buttons */
-    .stButton > button {
-        background-color: #1db954;
-        color: #ffffff;
-        border: none;
-        border-radius: 20px;
-        font-weight: bold;
-    }
-    
-    .stButton > button:hover {
-        background-color: #1ed760;
-    }
-    
-    /* Filter section styling */
-    .filter-container {
-        background-color: #181818;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        border: 1px solid #535353;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-    
-    /* Sticky filter section */
-    .sticky-filters {
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        background-color: #121212;
-        padding: 1rem 0;
-        border-bottom: 2px solid #1db954;
-    }
-    
-    /* Improve multiselect styling */
-    .stMultiSelect > div > div {
-        background-color: #2a2a2a !important;
-        border: 1px solid #535353 !important;
-        border-radius: 8px !important;
-    }
-    
-    .stMultiSelect span {
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect [data-baseweb="tag"] {
-        background-color: #1db954 !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect [data-baseweb="tag"] span {
-        color: #ffffff !important;
-    }
-    
-    /* Date input - Dark theme to match dropdowns */
-    .stDateInput, .stDateInput div, .stDateInput span, .stDateInput p {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    .stDateInput > div > div > input {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border: 1px solid #535353 !important;
-    }
-    
-    .stDateInput > div > div {
-        background-color: #2a2a2a !important;
-    }
-    
-    .stDateInput input {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        background-color: #181818;
-        color: #ffffff;
-        border: 1px solid #535353;
-    }
-    
-    /* Success/Info messages */
-    .stSuccess {
-        background-color: #1db954;
-        color: #ffffff !important;
-    }
-    
-    .stSuccess > div {
-        color: #ffffff !important;
-    }
-    
-    .stInfo {
-        background-color: #2a2a2a;
-        color: #ffffff !important;
-        border-left: 4px solid #1db954;
-    }
-    
-    .stInfo > div {
-        color: #ffffff !important;
-    }
-    
-    .stInfo p, .stInfo div, .stInfo span {
-        color: #ffffff !important;
-    }
-    
-    /* Dataframe */
-    .stDataFrame {
-        background-color: #181818;
-        color: #ffffff;
-    }
-    
-    /* Checkbox */
-    .stCheckbox > label {
-        color: #ffffff;
-    }
-    
-    /* Additional text color fixes - exclude form controls */
-    p:not(.stSelectbox p):not(.stMultiSelect p):not(.stDateInput p), 
-    div:not(.stSelectbox div):not(.stMultiSelect div):not(.stDateInput div), 
-    span:not(.stSelectbox span):not(.stMultiSelect span):not(.stDateInput span) {
-        color: #ffffff;
-    }
-    
-    /* Form labels should be white (above the controls) */
-    .stDateInput > label, .stSelectbox > label, .stMultiSelect > label {
-        color: #ffffff !important;
-    }
-    
-    /* All text elements */
-    .stMarkdown, .stMarkdown p, .stMarkdown div {
-        color: #ffffff !important;
-    }
-    
-    /* Chart legends and labels - force white text */
-    .legend text {
-        fill: #ffffff !important;
-    }
-    
-    /* Plotly chart text */
-    .js-plotly-plot .plotly .legendtext {
-        fill: #ffffff !important;
-    }
-    
-    /* Dropdown menus and options - COMPREHENSIVE */
-    [data-baseweb="select"], [data-baseweb="select"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    [data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
-    }
-    
-    [data-baseweb="popover"], [data-baseweb="popover"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    [data-baseweb="menu"], [data-baseweb="menu"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    [data-baseweb="menu"] li, [data-baseweb="menu"] li * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    [data-baseweb="menu"] li:hover, [data-baseweb="menu"] li:hover * {
-        background-color: #1db954 !important;
-        color: #ffffff !important;
-    }
-    
-    /* Streamlit dropdown options */
-    ul[role="listbox"], ul[role="listbox"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    ul[role="listbox"] li, ul[role="listbox"] li * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    ul[role="listbox"] li:hover, ul[role="listbox"] li:hover * {
-        background-color: #1db954 !important;
-        color: #ffffff !important;
-    }
-    
-    /* Additional dropdown menu selectors */
-    .stSelectbox ul, .stSelectbox ul * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    .stSelectbox li, .stSelectbox li * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    .stSelectbox li:hover, .stSelectbox li:hover * {
-        background-color: #1db954 !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect ul, .stMultiSelect ul * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    .stMultiSelect li, .stMultiSelect li * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    .stMultiSelect li:hover, .stMultiSelect li:hover * {
-        background-color: #1db954 !important;
-        color: #ffffff !important;
-    }
-    
-    /* Additional form controls */
-    .stSelectbox [data-testid="stSelectbox"] > div > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    .stMultiSelect [data-testid="stMultiSelect"] > div > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    /* Input fields */
-    input {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border: 1px solid #535353 !important;
-    }
-    
-    /* Text areas */
-    textarea {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border: 1px solid #535353 !important;
-    }
-    
-    /* React Select components */
-    .css-26l3qy-menu, .css-26l3qy-menu * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    .css-1pahdxg-control, .css-1pahdxg-control * {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border: 1px solid #535353 !important;
-    }
-    
-    .css-1hwfws3, .css-1hwfws3 * {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    /* Any CSS class that contains 'menu' or 'option' */
-    [class*="menu"], [class*="menu"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    [class*="option"], [class*="option"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    [class*="listbox"], [class*="listbox"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    /* Dropdown portal content (rendered outside component tree) */
-    div[role="presentation"], div[role="presentation"] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    div[data-floating-ui-portal], div[data-floating-ui-portal] * {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-    }
-    
-    /* Additional Streamlit overrides */
-    .stSelectbox > div > div[data-baseweb="select"] {
-        background-color: #2a2a2a !important;
-    }
-    
-    .stSelectbox > div > div[data-baseweb="select"] > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-    }
-    
-    /* Ensure dropdown arrows are visible */
-    .stSelectbox svg {
-        fill: #ffffff !important;
-    }
-    
-    .stMultiSelect svg {
-        fill: #ffffff !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Default Streamlit styling (no custom CSS)
+
+# Initialize session state for chat
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
+if "gemini_model" not in st.session_state:
+    st.session_state.gemini_model = None
+if "data_context_hash" not in st.session_state:
+    st.session_state.data_context_hash = None
+
+def setup_gemini_api():
+    """Setup Gemini API with error handling"""
+    try:
+        # Try to get API key from Streamlit secrets
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key = st.secrets["GEMINI_API_KEY"]
+        else:
+            return None, "API key not found in Streamlit secrets"
+        
+        if not api_key or api_key == "your-gemini-api-key-here":
+            return None, "Please replace the placeholder API key with your actual Gemini API key"
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        return model, None
+    except Exception as e:
+        return None, f"Error setting up Gemini API: {str(e)}"
+
+def get_data_context(df, df_filtered, is_filtered):
+    """Generate data context for the AI"""
+    context = {
+        "dataset_info": {
+            "total_records": len(df),
+            "filtered_records": len(df_filtered) if is_filtered else len(df),
+            "date_range": f"{df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}",
+            "columns": list(df.columns),
+            "is_filtered": is_filtered
+        },
+        "summary_stats": {
+            "total_hours": float(df_filtered['hours_played'].sum()),
+            "total_plays": len(df_filtered),
+            "unique_artists": df_filtered['artist_name'].nunique(),
+            "unique_tracks": df_filtered['track_name'].nunique(),
+            "date_range_filtered": f"{df_filtered['ts'].min().strftime('%Y-%m-%d')} to {df_filtered['ts'].max().strftime('%Y-%m-%d')}" if len(df_filtered) > 0 else "No data",
+            "top_artists": df_filtered['artist_name'].value_counts().head(10).to_dict(),
+            "top_tracks": df_filtered['track_name'].value_counts().head(5).to_dict()
+        }
+    }
+    return context
+
+def create_system_prompt(data_context):
+    """Create system prompt for Gemini"""
+    return f"""You are a Spotify listening data analyst with FULL ACCESS to powerful data analysis tools. You have complete access to a Spotify streaming history dataset and can perform ANY data analysis requested.
+
+DATASET ACCESS:
+- **df_filtered**: Currently filtered dataset ({data_context['dataset_info']['filtered_records']:,} records)
+- **df_full**: Complete unfiltered dataset ({data_context['dataset_info']['total_records']:,} records)
+- **Full date range**: {data_context['dataset_info']['date_range']}
+- **Current filter**: {'Applied' if data_context['dataset_info']['is_filtered'] else 'No filters applied'}
+
+CURRENT DATA SUMMARY (FILTERED):
+- Total listening hours: {data_context['summary_stats']['total_hours']:.1f}
+- Total plays: {data_context['summary_stats']['total_plays']:,}
+- Unique artists: {data_context['summary_stats']['unique_artists']:,}
+- Unique tracks: {data_context['summary_stats']['unique_tracks']:,}
+- Time period: {data_context['summary_stats']['date_range_filtered']}
+
+TOP ARTISTS (by play count): {', '.join([f"{artist} ({count})" for artist, count in list(data_context['summary_stats']['top_artists'].items())[:5]])}
+
+AVAILABLE TOOLS & LIBRARIES:
+- **pandas (pd)**: Full pandas functionality for complex data manipulation
+- **plotly (px, go)**: Advanced plotting and visualization
+- **numpy (np)**: Numerical operations
+- **streamlit (st)**: Display results
+- **ALL pandas operations**: groupby, merge, pivot, time series analysis, filtering, etc.
+
+AVAILABLE COLUMNS:
+{', '.join(data_context['dataset_info']['columns'])}
+
+KEY COLUMNS EXPLAINED:
+- ts: timestamp (datetime) - use for time-based analysis
+- ms_played: milliseconds played
+- hours_played, minutes_played: derived listening time
+- track_name, artist_name, album_name: music metadata
+- skipped: boolean if track was skipped
+- date, hour, day_of_week, month, year: derived time fields
+
+YOUR CAPABILITIES:
+✅ **Complex Data Analysis**: You CAN perform advanced filtering, grouping, time-series analysis
+✅ **Multi-dataset Comparison**: You CAN compare different time periods using df_full
+✅ **Statistical Analysis**: You CAN calculate trends, patterns, correlations
+✅ **Time-based Filtering**: You CAN filter by years, months, date ranges
+✅ **Advanced Queries**: You CAN answer complex questions about listening habits
+
+CRITICAL INSTRUCTIONS:
+1. **NEVER EXPLAIN YOUR PROCESS**: Don't mention filtering, grouping, datasets, or methodology
+2. **DIRECT ANSWERS ONLY**: Jump straight to the insights and results
+3. **PLAYFUL TONE**: Be conversational, fun, and engaging
+4. **NO TECHNICAL LANGUAGE**: Avoid words like "requires", "accessing", "determining", "data analysis"
+5. **JUST THE FACTS**: Give specific numbers and insights without explaining how you got them
+6. **USE df_full BY DEFAULT**, switch to df_filtered for questions where it's important to use the filtered dataset
+7. **NO CODE OR CHARTS**: Never generate visualizations or show code
+8. **DEFAULT TO LISETNING TIME RATHER THAN PLAYRS** when asked for top artists, tracks or trends default to listening time.
+
+FORBIDDEN PHRASES:
+❌ "requires accessing", "needs to be filtered", "after filtering", "determining", "unfortunately"
+❌ "based on analysis", "the data shows", "by examining", "requires grouping"
+❌ Any mention of datasets, filtering, or technical processes
+
+RESPONSE STYLE:
+✅ Direct, enthusiastic, conversational
+✅ Start with the answer immediately
+✅ Include specific numbers and fun insights
+✅ Use casual language and personality
+
+RESPONSE EXAMPLES:
+
+**❌ BAD (what you DON'T want):**
+User: "What was my most listened-to album in 2022?"
+AI: "Determining your most listened-to album in 2022 requires accessing the full dataset and filtering..."
+
+**✅ GOOD (what you DO want):**
+User: "What was my most listened-to album in 2022?"
+AI: "Your most listened-to album in 2022 was 'Aja' by Steely Dan with 317 plays! You were totally obsessed with that one."
+
+**More Examples:**
+
+User: "Songs I played a lot in 2024 but haven't listened to much in 2025"
+AI: "Oh wow, you've really moved on from some songs! 'Song Title 1' by Artist went from 89 plays in 2024 to just 3 plays this year - that's a 97% drop! 'Song Title 2' also fell hard from 72 to 8 plays. Looks like you had 15 songs you were obsessed with in 2024 (50+ plays each) that you've barely touched in 2025. Your taste has definitely evolved!"
+
+User: "What's my most played song?"
+AI: "'Song Title' by Artist Name is your absolute favorite with 127 plays and 8.5 hours of listening time! That's 2.3% of all your music time in this period."
+
+User: "How do my weekends compare to weekdays?"
+AI: "You're a weekend music lover! You listen 40% more on weekends (3.2 hours daily) compared to weekdays (2.3 hours). Plus your weekend vibe is totally different - more pop and electronic, while weekdays you're into indie and alternative stuff."
+
+CORE RULE: Jump straight to the fun insights with real numbers. Be enthusiastic and conversational. NO methodology talk!"""
+
+def execute_ai_code(code, df_filtered, df_full=None):
+    """Safely execute AI-generated code"""
+    try:
+        # Create a restricted namespace
+        namespace = {
+            'df_filtered': df_filtered,
+            'df_full': df_full,
+            'pd': pd,
+            'px': px,
+            'go': go,
+            'plt': plt,
+            'np': np,
+            'st': st,
+            'make_subplots': make_subplots
+        }
+        
+        # Execute the code
+        exec(code, namespace)
+        return True, None
+    except Exception as e:
+        return False, f"Error executing code: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+
+def create_chat_interface(df, df_filtered):
+    """Create the chat interface in sidebar"""
+    # Check if data context has changed
+    current_hash = hash(str(df_filtered.shape) + str(df_filtered['ts'].min()) + str(df_filtered['ts'].max()))
+    context_changed = st.session_state.data_context_hash != current_hash
+    
+    if context_changed:
+        st.session_state.data_context_hash = current_hash
+        # Add a system message about context change
+        if len(st.session_state.chat_messages) > 0:
+            st.session_state.chat_messages.append({
+                "role": "assistant",
+                "content": "📊 **Data context updated** - I'm now analyzing your filtered dataset with " + 
+                          f"{len(df_filtered):,} records from {df_filtered['ts'].min().strftime('%Y-%m-%d')} to " +
+                          f"{df_filtered['ts'].max().strftime('%Y-%m-%d')}" if len(df_filtered) > 0 else "No data in current filter."
+            })
+    
+    st.markdown("### 🤖 Ask About Your Music Data")
+    
+    # Setup Gemini API
+    if st.session_state.gemini_model is None:
+        model, error = setup_gemini_api()
+        if error:
+            st.error("**Gemini API Setup Required**")
+            
+            st.markdown("""
+            <div class="api-key-info">
+            <h4>🔑 How to set up Gemini API:</h4>
+            <ol>
+                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></li>
+                <li>Sign in with your Google account</li>
+                <li>Click "Create API Key"</li>
+                <li>Copy your API key</li>
+                <li>In Streamlit Cloud: Go to your app settings → Secrets → Add:</li>
+                <pre><code>GEMINI_API_KEY = "your-api-key-here"</code></pre>
+                <li>For local development, create <code>.streamlit/secrets.toml</code>:</li>
+                <pre><code>[secrets]
+GEMINI_API_KEY = "your-api-key-here"</code></pre>
+            </ol>
+            <p><strong>Note:</strong> The API is free with generous usage limits!</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Offer manual API key input for testing
+            with st.expander("🔧 Enter API Key Manually (for testing)"):
+                manual_key = st.text_input("Gemini API Key", type="password", key="manual_gemini_key")
+                if manual_key and st.button("Setup API"):
+                    try:
+                        genai.configure(api_key=manual_key)
+                        st.session_state.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+                        st.success("✅ API configured successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ API setup failed: {str(e)}")
+            return
+        else:
+            st.session_state.gemini_model = model
+            st.success("✅ Gemini AI ready!")
+    
+    # Show data context info
+    is_filtered = len(df_filtered) != len(df)
+    data_info = f"📊 **Current dataset:** {len(df_filtered):,} records"
+    if is_filtered:
+        data_info += f" (filtered from {len(df):,} total)"
+    st.caption(data_info)
+    
+    # Display chat messages
+    for message in st.session_state.chat_messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+    
+    # Suggested questions for new users
+    if len(st.session_state.chat_messages) == 0:
+        st.markdown("**💡 Try asking:**")
+        suggestions = [
+            "What's my most played song?",
+            "Show my listening patterns by hour",
+            "Which artist do I listen to most?",
+            "Create a chart of my monthly listening",
+            "What's my skip rate?"
+        ]
+        
+        for suggestion in suggestions:
+            if st.button(suggestion, key=f"suggestion_{suggestion}"):
+                # Add user message
+                st.session_state.chat_messages.append({"role": "user", "content": suggestion})
+                st.rerun()
+    
+    # Chat input
+    if user_input := st.chat_input("Ask me anything about your music data...", key="main_chat_input"):
+        # Add user message to session state
+        st.session_state.chat_messages.append({"role": "user", "content": user_input})
+        # Set flag to generate response
+        st.session_state.needs_response = True
+    
+    # Check if we need to generate a response
+    if (len(st.session_state.chat_messages) > 0 and 
+        st.session_state.chat_messages[-1]["role"] == "user" and
+        (len(st.session_state.chat_messages) % 2 == 1 or st.session_state.get("needs_response", False))):  # Odd number means last is user message without response
+        
+        user_question = st.session_state.chat_messages[-1]["content"]
+        
+        # Show spinner while generating response
+        with st.spinner("🤖 Analyzing your data..."):
+            try:
+                # Get data context
+                data_context = get_data_context(df, df_filtered, is_filtered)
+                system_prompt = create_system_prompt(data_context)
+                
+                # Create conversation history for context
+                conversation_history = ""
+                for msg in st.session_state.chat_messages[-5:]:  # Last 5 messages for context
+                    conversation_history += f"{msg['role']}: {msg['content']}\n"
+                
+                # Generate response
+                full_prompt = f"{system_prompt}\n\nCONVERSATION HISTORY:\n{conversation_history}\n\nUSER QUESTION: {user_question}\n\nPlease provide analysis with code if needed:"
+                
+                response = st.session_state.gemini_model.generate_content(full_prompt)
+                ai_response = response.text
+                
+                # Add AI response to chat history and clear response flag
+                st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
+                st.session_state.needs_response = False
+                st.rerun()
+                
+            except Exception as e:
+                error_msg = f"❌ Sorry, I encountered an error: {str(e)}"
+                st.session_state.chat_messages.append({"role": "assistant", "content": error_msg})
+                st.session_state.needs_response = False
+                st.rerun()
+    
+    # Clear chat button
+    if len(st.session_state.chat_messages) > 0:
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.chat_messages = []
+            st.rerun()
 
 @st.cache_data
 def load_spotify_data():
@@ -574,19 +437,14 @@ def create_listening_timeline(df):
             x='date', 
             y='hours_played',
             title=title,
-            labels={'hours_played': 'Hours Played', 'date': x_label},
-            color_discrete_sequence=['#1db954']
+            labels={'hours_played': 'Hours Played', 'date': x_label}
         )
         
         fig.update_layout(
             showlegend=False,
             height=400,
             xaxis_title=x_label,
-            yaxis_title="Hours Played",
-            plot_bgcolor='#121212',
-            paper_bgcolor='#121212',
-            font_color='#ffffff',
-            title_font_color='#ffffff'
+            yaxis_title="Hours Played"
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -605,16 +463,11 @@ def create_top_artists_tracks(df):
             y=top_artists.index,
             orientation='h',
             title="Top 15 Artists by Listening Time",
-            labels={'x': 'Hours Played', 'y': 'Artist'},
-            color_discrete_sequence=['#1db954']
+            labels={'x': 'Hours Played', 'y': 'Artist'}
         )
         fig.update_layout(
             height=500, 
-            yaxis={'categoryorder': 'total ascending'},
-            plot_bgcolor='#121212',
-            paper_bgcolor='#121212',
-            font_color='#ffffff',
-            title_font_color='#ffffff'
+            yaxis={'categoryorder': 'total ascending'}
         )
         st.plotly_chart(fig, use_container_width=True)
         
@@ -664,16 +517,11 @@ def create_top_artists_tracks(df):
             y=top_tracks.index,
             orientation='h',
             title="Top 15 Tracks by Listening Time",
-            labels={'x': 'Hours Played', 'y': 'Track - Artist'},
-            color_discrete_sequence=['#1ed760']
+            labels={'x': 'Hours Played', 'y': 'Track - Artist'}
         )
         fig.update_layout(
             height=500, 
-            yaxis={'categoryorder': 'total ascending'},
-            plot_bgcolor='#121212',
-            paper_bgcolor='#121212',
-            font_color='#ffffff',
-            title_font_color='#ffffff'
+            yaxis={'categoryorder': 'total ascending'}
         )
         st.plotly_chart(fig, use_container_width=True)
         
@@ -747,15 +595,10 @@ def create_listening_patterns(df):
                 x=hourly_listening.index,
                 y=hourly_listening.values,
                 title="Listening Activity by Hour of Day",
-                labels={'x': 'Hour of Day', 'y': 'Hours Played'},
-                color_discrete_sequence=['#1db954']
+                labels={'x': 'Hour of Day', 'y': 'Hours Played'}
             )
             fig.update_layout(
-                height=400,
-                plot_bgcolor='#121212',
-                paper_bgcolor='#121212',
-                font_color='#ffffff',
-                title_font_color='#ffffff'
+                height=400
             )
             st.plotly_chart(fig, use_container_width=True)
         
@@ -768,15 +611,10 @@ def create_listening_patterns(df):
                 x=daily_listening.index,
                 y=daily_listening.values,
                 title="Listening Activity by Day of Week",
-                labels={'x': 'Day of Week', 'y': 'Hours Played'},
-                color_discrete_sequence=['#1ed760']
+                labels={'x': 'Day of Week', 'y': 'Hours Played'}
             )
             fig.update_layout(
-                height=400,
-                plot_bgcolor='#121212',
-                paper_bgcolor='#121212',
-                font_color='#ffffff',
-                title_font_color='#ffffff'
+                height=400
             )
             st.plotly_chart(fig, use_container_width=True)
     
@@ -793,15 +631,10 @@ def create_listening_patterns(df):
         fig = px.imshow(
             heatmap_pivot,
             title="Listening Activity Heatmap (Day vs Hour)",
-            labels={'x': 'Hour of Day', 'y': 'Day of Week', 'color': 'Hours Played'},
-            color_continuous_scale=[[0, '#121212'], [0.5, '#1db954'], [1, '#1ed760']]
+            labels={'x': 'Hour of Day', 'y': 'Day of Week', 'color': 'Hours Played'}
         )
         fig.update_layout(
-            height=500,
-            plot_bgcolor='#121212',
-            paper_bgcolor='#121212',
-            font_color='#ffffff',
-            title_font_color='#ffffff'
+            height=500
         )
         st.plotly_chart(fig, use_container_width=True)
     
@@ -818,16 +651,10 @@ def create_listening_patterns(df):
                 x=monthly_listening.index,
                 y=monthly_listening.values,
                 title="Listening Activity by Month",
-                labels={'x': 'Month', 'y': 'Hours Played'},
-                color_discrete_sequence=['#1db954']
+                labels={'x': 'Month', 'y': 'Hours Played'}
             )
             fig.update_layout(
-                height=400,
-                plot_bgcolor='#121212',
-                paper_bgcolor='#121212',
-                font_color='#ffffff',
-                title_font_color='#ffffff'
-            )
+                height=400)
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
         
@@ -842,48 +669,13 @@ def create_listening_patterns(df):
                 y='hours_played',
                 color='year',
                 title="Monthly Listening by Year",
-                labels={'hours_played': 'Hours Played', 'month': 'Month'},
-                color_discrete_sequence=['#1db954', '#1ed760', '#ff6b35', '#f7931e', '#c13584']
+                labels={'hours_played': 'Hours Played', 'month': 'Month'}
             )
             fig.update_layout(
-                height=400,
-                plot_bgcolor='#121212',
-                paper_bgcolor='#121212',
-                font_color='#ffffff',
-                title_font_color='#ffffff',
-                legend=dict(
-                    bgcolor='rgba(0,0,0,0)',
-                    font_color='#ffffff'
-                )
+                height=400
             )
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
-
-def create_discovery_analysis(df):
-    """Analyze music discovery patterns"""
-    st.subheader("🔍 Music Discovery Analysis")
-    
-    # Calculate first play date for each track
-    first_plays = df.groupby(['track_name', 'artist_name'])['ts'].min().reset_index()
-    first_plays['year'] = first_plays['ts'].dt.year
-    
-    # Count new tracks discovered each year
-    discoveries_by_year = first_plays.groupby('year').size()
-    
-    fig = px.bar(
-        x=discoveries_by_year.index,
-        y=discoveries_by_year.values,
-        title="New Tracks Discovered by Year",
-        labels={'x': 'Year', 'y': 'New Tracks Discovered'},
-        color_discrete_sequence=['#1db954']
-    )
-    fig.update_layout(
-        plot_bgcolor='#121212',
-        paper_bgcolor='#121212',
-        font_color='#ffffff',
-        title_font_color='#ffffff'
-    )
-    st.plotly_chart(fig, use_container_width=True)
 
 def create_skip_analysis(df):
     """Analyze skipping behavior"""
@@ -907,17 +699,11 @@ def create_skip_analysis(df):
             y=top_skip_artists.index,
             orientation='h',
             title="Artists with Highest Skip Rates (10+ plays)",
-            labels={'x': 'Skip Rate (%)', 'y': 'Artist'},
-            color_discrete_sequence=['#ff6b35']
+            labels={'x': 'Skip Rate (%)', 'y': 'Artist'}
         )
         fig.update_layout(
             height=400, 
-            yaxis={'categoryorder': 'total ascending'},
-            plot_bgcolor='#121212',
-            paper_bgcolor='#121212',
-            font_color='#ffffff',
-            title_font_color='#ffffff'
-        )
+            yaxis={'categoryorder': 'total ascending'})
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
@@ -958,16 +744,10 @@ def create_skip_analysis(df):
             x='time_period',
             y='skip_rate',
             title=title,
-            labels={'skip_rate': 'Skip Rate (%)', 'time_period': 'Date'},
-            color_discrete_sequence=['#ff6b35']
+            labels={'skip_rate': 'Skip Rate (%)', 'time_period': 'Date'}
         )
         fig.update_layout(
-            height=400,
-            plot_bgcolor='#121212',
-            paper_bgcolor='#121212',
-            font_color='#ffffff',
-            title_font_color='#ffffff'
-        )
+            height=400)
         st.plotly_chart(fig, use_container_width=True)
 
 def create_stacked_area_charts(df):
@@ -1075,20 +855,8 @@ def create_stacked_area_charts(df):
     # Create 100% stacked area chart
     fig = go.Figure()
     
-    # Define Spotify-inspired colors
-    spotify_colors = [
-        '#1db954', '#1ed760', '#ff6b35', '#f7931e', '#c13584',
-        '#00d4ff', '#ff9500', '#8b5a3c', '#6a994e', '#bc4749',
-        '#577590', '#f8961e', '#90e0ef', '#ffd166', '#06ffa5',
-        '#ff006e', '#8338ec', '#3a86ff', '#06ffa5', '#fb8500'
-    ]
-    colors = spotify_colors * 10  # Repeat colors if needed
-    
     # Add traces for each artist/track (in reverse order for proper stacking and legend display)
-    for i, item in enumerate(reversed(column_order)):
-        # Use gray for "Other" category
-        color = "#535353" if item == "Other" else colors[i % len(colors)]
-        
+    for i, item in enumerate(reversed(column_order)):        
         fig.add_trace(go.Scatter(
             x=pivot_data_pct.index,
             y=pivot_data_pct[item],
@@ -1096,7 +864,6 @@ def create_stacked_area_charts(df):
             stackgroup='one',
             name=item,
             line=dict(width=0.5),
-            fillcolor=color,
             hovertemplate=f'<b>{item}</b><br>' +
                          f'{period_label}: %{{x}}<br>' +
                          'Percentage: %{y:.1f}%<br>' +
@@ -1110,25 +877,7 @@ def create_stacked_area_charts(df):
         xaxis_title=period_label,
         yaxis_title="Percentage of Listening Time (%)",
         height=500,
-        hovermode='x unified',
-        plot_bgcolor='#121212',
-        paper_bgcolor='#121212',
-        font_color='#ffffff',
-        title_font_color='#ffffff',
-        legend=dict(
-            orientation="v",
-            yanchor="top",
-            y=1,
-            xanchor="left",
-            x=1.02,
-            traceorder="normal",  # This will show legend in the order we added traces
-            bgcolor='rgba(0,0,0,0)',
-            font_color='#ffffff'
-        ),
-        yaxis=dict(
-            range=[0, 100],
-            ticksuffix="%"
-        )
+        hovermode='x unified'
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -1208,25 +957,22 @@ def create_artist_wordcloud(df):
             frequencies[clean_artist] = float(value)
         
         if frequencies:
-            # Create word cloud using frequencies with Spotify colors
+            # Create word cloud using frequencies
             wordcloud = WordCloud(
                 width=800, 
                 height=400, 
-                background_color='#121212',
-                colormap='Greens',
+                background_color='white',
                 max_words=max_artists,
                 relative_scaling=0.5,
                 min_font_size=8,
-                prefer_horizontal=0.8,
-                color_func=lambda *args, **kwargs: '#1db954'
+                prefer_horizontal=0.8
             ).generate_from_frequencies(frequencies)
             
-            # Display using matplotlib with dark background
-            fig, ax = plt.subplots(figsize=(12, 6), facecolor='#121212')
+            # Display using matplotlib
+            fig, ax = plt.subplots(figsize=(12, 6))
             ax.imshow(wordcloud, interpolation='bilinear')
             ax.axis('off')
-            ax.set_title(subtitle, fontsize=14, pad=20, color='#ffffff')
-            ax.set_facecolor('#121212')
+            ax.set_title(subtitle, fontsize=14, pad=20)
             st.pyplot(fig)
             
             # Show top 10 in text format below
@@ -1297,28 +1043,23 @@ def create_time_based_analysis(df):
         )
         
         fig.add_trace(
-            go.Bar(x=time_stats.index, y=time_stats['Total Hours'], name='Total Hours', marker_color='#1db954'),
+            go.Bar(x=time_stats.index, y=time_stats['Total Hours'], name='Total Hours'),
             row=1, col=1
         )
         
         fig.add_trace(
-            go.Bar(x=time_stats.index, y=time_stats['Total Plays'], name='Total Plays', marker_color='#1ed760'),
+            go.Bar(x=time_stats.index, y=time_stats['Total Plays'], name='Total Plays'),
             row=1, col=2
         )
         
         fig.add_trace(
-            go.Bar(x=time_stats.index, y=time_stats['Unique Artists'], name='Unique Artists', marker_color='#ff6b35'),
+            go.Bar(x=time_stats.index, y=time_stats['Unique Artists'], name='Unique Artists'),
             row=1, col=3
         )
         
         fig.update_layout(
             height=400, 
-            showlegend=False,
-            plot_bgcolor='#121212',
-            paper_bgcolor='#121212',
-            font_color='#ffffff',
-            title_font_color='#ffffff'
-        )
+            showlegend=False)
         fig.update_xaxes(title_text=x_title)
         
         # Rotate x-axis labels if needed
@@ -1327,7 +1068,35 @@ def create_time_based_analysis(df):
         
         st.plotly_chart(fig, use_container_width=True)
 
+def create_discovery_analysis(df):
+    """Analyze music discovery patterns"""
+    st.subheader("🔍 Music Discovery Analysis")
+    
+    # Calculate first play date for each track
+    first_plays = df.groupby(['track_name', 'artist_name'])['ts'].min().reset_index()
+    first_plays['year'] = first_plays['ts'].dt.year
+    
+    # Count new tracks discovered each year
+    discoveries_by_year = first_plays.groupby('year').size()
+    
+    fig = px.bar(
+        x=discoveries_by_year.index,
+        y=discoveries_by_year.values,
+        title="New Tracks Discovered by Year",
+        labels={'x': 'Year', 'y': 'New Tracks Discovered'}
+    )
+    fig.update_layout(height=400)
+    st.plotly_chart(fig, use_container_width=True)
+
 def main():
+    # Create sidebar with chat interface
+    with st.sidebar:
+        # Add toggle for chat interface
+        chat_enabled = st.checkbox("🤖 Enable AI Chat", value=True, key="chat_toggle")
+        
+        if chat_enabled:
+            st.markdown("---")
+    
     # Header
     st.title("🎵 Spotify Listening History Dashboard")
     
@@ -1336,13 +1105,7 @@ def main():
         df = load_spotify_data()
         st.success(f"Successfully loaded {len(df):,} listening records from {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
         
-        # Top filters section with sticky styling
-        st.markdown("""
-        <div class="sticky-filters">
-        <div style="background-color: #181818; padding: 1.5rem; border-radius: 10px; 
-                   border: 1px solid #535353; margin-bottom: 1rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
-        """, unsafe_allow_html=True)
-        
+        # Filters section
         st.markdown("### 🎛️ Filters")
         
         # Create filter container
@@ -1444,8 +1207,12 @@ def main():
         if selected_artists:
             df_filtered = df_filtered[df_filtered['artist_name'].isin(selected_artists)]
         
-        # Close the filter container
-        st.markdown("</div></div>", unsafe_allow_html=True)
+
+        
+        # Add chat interface to sidebar if enabled
+        if chat_enabled:
+            with st.sidebar:
+                create_chat_interface(df, df_filtered)
         
         st.markdown("---")
         
