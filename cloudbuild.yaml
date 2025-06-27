@@ -1,12 +1,6 @@
 options:
   logging: CLOUD_LOGGING_ONLY
 
-# Define secrets from Google Secret Manager
-availableSecrets:
-  secretManager:
-    - versionName: projects/decoded-jigsaw-341521/secrets/gemini_key/versions/latest
-      env: 'GEMINI_KEY'
-
 steps:
   # Step 1: Build the Docker image with the latest tag
   - name: 'gcr.io/cloud-builders/docker'
@@ -23,7 +17,6 @@ steps:
   # Step 3: Deploy the latest tag to Google Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
-    secretEnv: ['GEMINI_KEY']
     args:
       - '-c'
       - |
@@ -38,7 +31,7 @@ steps:
           --max-instances 10 \
           --concurrency 10 \
           --cpu 2 \
-          --set-env-vars GEMINI_KEY=$$GEMINI_KEY
+          --set-secrets GEMINI_KEY=gemini_key:latest
 
 images:
   - 'us-central1-docker.pkg.dev/decoded-jigsaw-341521/github-fun-spotify/fun-spotify-dashboard:latest' 
