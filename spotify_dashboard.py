@@ -40,6 +40,8 @@ def setup_gemini_api():
         # Try to get API key from Streamlit secrets
         if "GEMINI_API_KEY" in st.secrets:
             api_key = st.secrets["GEMINI_API_KEY"]
+        elif "GEMINI_API_KEY" in os.environ:
+            api_key = os.environ["GEMINI_API_KEY"]
         else:
             return None, "API key not found in Streamlit secrets"
         

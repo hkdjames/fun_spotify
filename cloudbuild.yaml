@@ -31,7 +31,7 @@ steps:
           --max-instances 10 \
           --concurrency 10 \
           --cpu 2 \
-          --set-secrets GEMINI_KEY=gemini_key:latest
+          --set-secrets GEMINI_API_KEY=gemini_key:latest
 
 images:
   - 'us-central1-docker.pkg.dev/decoded-jigsaw-341521/github-fun-spotify/fun-spotify-dashboard:latest' 
