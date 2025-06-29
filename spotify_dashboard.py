@@ -115,6 +115,12 @@ AVAILABLE TOOLS & LIBRARIES:
 - **streamlit (st)**: Display results
 - **ALL pandas operations**: groupby, merge, pivot, time series analysis, filtering, etc.
 
+PRE-COMPUTED HELPERS (ready to use):
+- **top_tracks_by_hours**: df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+- **top_artists_by_hours**: df_full.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False)
+
+💡 Use these pre-computed variables for instant access to common results!
+
 AVAILABLE COLUMNS:
 {', '.join(data_context['dataset_info']['columns'])}
 
@@ -148,6 +154,21 @@ plays = len(df_full[df_full['track_artist'] == track_artist_to_check])
 print(f"Validation: {track_artist_to_check} = {result:.1f} hours, {plays} plays")
 ```
 
+EXAMPLE TRACK ANALYSIS CODE (when showing work):
+```python
+# SIMPLE method using pre-computed helpers:
+most_played_track = top_tracks_by_hours.index[0]
+most_played_hours = top_tracks_by_hours.iloc[0]
+plays_count = len(df_full[df_full['track_artist'] == most_played_track])
+print(f"Most listened track: {most_played_track} with {most_played_hours:.1f} hours and {plays_count} plays")
+
+# Alternative - define your own if needed:
+my_top_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+print(f"Top track: {my_top_tracks.index[0]} with {my_top_tracks.iloc[0]:.1f} hours")
+```
+
+⚠️ CRITICAL: Always define your variables before using them! Never reference undefined variables like 'all_tracks'.
+
 YOUR CAPABILITIES:
 ✅ **Complex Data Analysis**: You CAN perform advanced filtering, grouping, time-series analysis
 ✅ **Multi-dataset Comparison**: You CAN compare different time periods using df_full
@@ -177,18 +198,16 @@ RESPONSE STYLE:
 ✅ Include specific numbers and fun insights
 ✅ Use casual language and personality
 
-EXAMPLE TRACK ANALYSIS CODE (when showing work):
-```python
-# CORRECT way to find top tracks
-top_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
-```
-
 CORE RULE: Jump straight to the fun insights with real numbers. Be enthusiastic and conversational. NO methodology talk unless explicitly asked to show work!"""
 
 def execute_ai_code(code, df_filtered, df_full=None):
     """Safely execute AI-generated code"""
     try:
-        # Create a restricted namespace
+        # Pre-compute common analysis results to prevent undefined variable errors
+        top_tracks_by_hours = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False) if df_full is not None else None
+        top_artists_by_hours = df_full.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False) if df_full is not None else None
+        
+        # Create a restricted namespace with pre-computed helpers
         namespace = {
             'df_filtered': df_filtered,
             'df_full': df_full,
@@ -198,7 +217,10 @@ def execute_ai_code(code, df_filtered, df_full=None):
             'plt': plt,
             'np': np,
             'st': st,
-            'make_subplots': make_subplots
+            'make_subplots': make_subplots,
+            # Pre-computed helpers to prevent undefined variable errors
+            'top_tracks_by_hours': top_tracks_by_hours,
+            'top_artists_by_hours': top_artists_by_hours,
         }
         
         # Execute the code
