@@ -1157,7 +1157,8 @@ def main():
                 st.write("**Track name variations that were normalized:**")
                 for example in quality_info['examples']:
                     st.write(f"**{example['cleaned_name']}**")
-                    st.write(f"   Original variations: {', '.join([f'"{name}"' for name in example['variations']])}")
+                    variations_text = ', '.join([f'"{name}"' for name in example['variations']])
+                    st.write(f"   Original variations: {variations_text}")
                     st.write("")
                 if quality_info['duplicates_detected'] > 5:
                     st.write(f"... and {quality_info['duplicates_detected'] - 5} more variations cleaned")
@@ -1303,7 +1304,9 @@ def main():
                     for track_artist, row in track_stats.head(10).iterrows():
                         st.write(f"**{track_artist}** - {row['hours_played']:.1f} hours")
                         if len(row['track_name_raw']) > 1 or len(row['artist_name_raw']) > 1:
-                            st.write(f"   Original variations: Track: {list(row['track_name_raw'])}, Artist: {list(row['artist_name_raw'])}")
+                            track_vars = list(row['track_name_raw'])
+                            artist_vars = list(row['artist_name_raw'])
+                            st.write(f"   Original variations: Track: {track_vars}, Artist: {artist_vars}")
                 else:
                     st.write("No matches found.")
         
