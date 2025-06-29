@@ -57,6 +57,14 @@ def setup_gemini_api():
 
 def get_data_context(df, df_filtered, is_filtered):
     """Generate data context for the AI"""
+    
+    # Calculate top tracks using the exact same method as dashboard
+    top_tracks_by_time = df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False).head(10)
+    top_tracks_dict = {}
+    for track_artist, hours in top_tracks_by_time.items():
+        plays = len(df[df['track_artist'] == track_artist])
+        top_tracks_dict[track_artist] = {'hours': float(hours), 'plays': plays}
+    
     context = {
         "dataset_info": {
             "total_records": len(df),
@@ -72,7 +80,7 @@ def get_data_context(df, df_filtered, is_filtered):
             "unique_tracks": df_filtered['track_name'].nunique(),
             "date_range_filtered": f"{df_filtered['ts'].min().strftime('%Y-%m-%d')} to {df_filtered['ts'].max().strftime('%Y-%m-%d')}" if len(df_filtered) > 0 else "No data",
             "top_artists": df_filtered['artist_name'].value_counts().head(10).to_dict(),
-            "top_tracks": df_filtered['track_name'].value_counts().head(5).to_dict()
+            "top_tracks_correct": top_tracks_dict  # EXACT results using track_artist method
         }
     }
     return context
@@ -95,6 +103,10 @@ CURRENT DATA SUMMARY (FILTERED):
 - Time period: {data_context['summary_stats']['date_range_filtered']}
 
 TOP ARTISTS (by play count): {', '.join([f"{artist} ({count})" for artist, count in list(data_context['summary_stats']['top_artists'].items())[:5]])}
+
+EXACT TOP TRACKS (what you MUST match): {', '.join([f"{track} ({data['hours']:.1f}h, {data['plays']} plays)" for track, data in list(data_context['summary_stats']['top_tracks_correct'].items())[:5]])}
+
+⚠️ VALIDATION REQUIREMENT: When asked about top tracks, your answer MUST match the above numbers exactly!
 
 AVAILABLE TOOLS & LIBRARIES:
 - **pandas (pd)**: Full pandas functionality for complex data manipulation
@@ -121,6 +133,20 @@ KEY COLUMNS EXPLAINED:
 - **NEVER group by 'track_name' alone** - this can miss duplicates and variations
 - The data has been cleaned to normalize track name variations (e.g., "Reelin' In The Years" vs "Reeling in the Years")
 - For accurate results: df.groupby('track_artist')['hours_played'].sum()
+
+⚠️ EXACT DASHBOARD METHODOLOGY - USE THIS EXACTLY:
+```python
+# EXACT method the dashboard uses for top tracks:
+all_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+top_track = all_tracks.iloc[0]  # Most played track
+print(f"Top track: {all_tracks.index[0]} with {top_track:.1f} hours")
+
+# To validate your result, always use:
+track_artist_to_check = "Track Name - Artist Name"  # Replace with actual track
+result = df_full[df_full['track_artist'] == track_artist_to_check]['hours_played'].sum()
+plays = len(df_full[df_full['track_artist'] == track_artist_to_check])
+print(f"Validation: {track_artist_to_check} = {result:.1f} hours, {plays} plays")
+```
 
 YOUR CAPABILITIES:
 ✅ **Complex Data Analysis**: You CAN perform advanced filtering, grouping, time-series analysis
@@ -1164,6 +1190,32 @@ def main():
                     st.write(f"... and {quality_info['duplicates_detected'] - 5} more variations cleaned")
                 st.info("💡 This normalization ensures accurate track statistics in both the dashboard and AI chat.")
         
+        # Add Dashboard vs AI Results Comparison
+        with st.expander("🔍 Dashboard vs AI Results Comparison"):
+            st.write("**Verify that dashboard and AI will get the same results:**")
+            
+            # Calculate top tracks using the exact same method as the dashboard
+            dashboard_top_tracks = df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False).head(10)
+            
+            st.write("**Top 10 tracks by listening time (what both dashboard and AI should show):**")
+            for i, (track_artist, hours) in enumerate(dashboard_top_tracks.items(), 1):
+                plays = len(df[df['track_artist'] == track_artist])
+                st.write(f"{i}. **{track_artist}** - {hours:.1f} hours ({plays} plays)")
+            
+            st.markdown("---")
+            st.write("**AI Validation Code:**")
+            st.code("""
+# This is the EXACT code Gemini should use:
+top_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+print(f"#1 Most played track: {top_tracks.index[0]} with {top_tracks.iloc[0]:.1f} hours")
+
+# To check specific track:
+track = "Reelin' In The Years - Steely Dan"  # Replace with actual track
+hours = df_full[df_full['track_artist'] == track]['hours_played'].sum()
+plays = len(df_full[df_full['track_artist'] == track])
+print(f"{track}: {hours:.1f} hours, {plays} plays")
+            """, language="python")
+        
         # Filters section
         st.markdown("### 🎛️ Filters")
         
@@ -1307,6 +1359,66 @@ def main():
                             track_vars = list(row['track_name_raw'])
                             artist_vars = list(row['artist_name_raw'])
                             st.write(f"   Original variations: Track: {track_vars}, Artist: {artist_vars}")
+                else:
+                    st.write("No matches found.")
+            
+            # Add detailed comparison tool
+            st.markdown("---")
+            st.write("**🔍 Detailed Track Analysis:**")
+            st.write("Search for a specific track to see ALL data entries and why results might differ:")
+            
+            specific_search = st.text_input("Enter exact track name (e.g., 'Reelin'):", key="specific_search")
+            if specific_search:
+                # Find all entries for this track
+                specific_matches = df[
+                    df['track_name'].str.contains(specific_search, case=False, na=False) |
+                    df['track_name_raw'].str.contains(specific_search, case=False, na=False)
+                ]
+                
+                if len(specific_matches) > 0:
+                    st.write(f"**Found {len(specific_matches)} individual plays matching '{specific_search}':**")
+                    
+                    # Show raw data breakdown
+                    raw_breakdown = specific_matches.groupby(['track_name_raw', 'artist_name_raw']).agg({
+                        'hours_played': ['sum', 'count'],
+                        'track_name': 'first',
+                        'artist_name': 'first',
+                        'track_artist': 'first'
+                    }).round(2)
+                    
+                    st.write("**Raw Data Breakdown (before cleaning):**")
+                    for (track_raw, artist_raw), row in raw_breakdown.iterrows():
+                        hours = row[('hours_played', 'sum')]
+                        plays = row[('hours_played', 'count')]
+                        cleaned_track = row[('track_name', 'first')]
+                        cleaned_artist = row[('artist_name', 'first')]
+                        track_artist = row[('track_artist', 'first')]
+                        
+                        st.write(f"**Original**: \"{track_raw}\" by \"{artist_raw}\"")
+                        st.write(f"   → **Cleaned to**: {track_artist}")
+                        st.write(f"   → **Stats**: {hours:.1f} hours, {plays} plays")
+                        st.write("")
+                    
+                    # Show final consolidated stats
+                    consolidated = specific_matches.groupby('track_artist').agg({
+                        'hours_played': 'sum',
+                        'ms_played': 'count'
+                    }).round(2)
+                    
+                    st.write("**Final Consolidated Results (what both dashboard and Gemini should show):**")
+                    for track_artist, row in consolidated.iterrows():
+                        hours = row['hours_played']
+                        plays = row['ms_played']
+                        st.write(f"🎵 **{track_artist}**: {hours:.1f} hours, {plays} plays")
+                    
+                    # Show what Gemini should use
+                    st.markdown("---")
+                    st.code(f"""
+# What Gemini should use for accurate results:
+top_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+# For '{specific_search}', this should return: {consolidated.iloc[0]['hours_played']:.1f} hours
+                    """, language="python")
+                    
                 else:
                     st.write("No matches found.")
         
