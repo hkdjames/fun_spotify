@@ -15,6 +15,7 @@ import seaborn as sns
 import google.generativeai as genai
 import re
 import traceback
+import io
 
 # Set page config
 st.set_page_config(
@@ -109,9 +110,17 @@ KEY COLUMNS EXPLAINED:
 - ts: timestamp (datetime) - use for time-based analysis
 - ms_played: milliseconds played
 - hours_played, minutes_played: derived listening time
-- track_name, artist_name, album_name: music metadata
+- track_name, artist_name, album_name: music metadata (cleaned and normalized)
+- track_name_raw, artist_name_raw: original uncleaned names from Spotify
+- track_artist: combined field "Track Name - Artist Name" (USE THIS FOR TRACK ANALYSIS)
 - skipped: boolean if track was skipped
 - date, hour, day_of_week, month, year: derived time fields
+
+⚠️ CRITICAL FOR TRACK ANALYSIS:
+- **ALWAYS use 'track_artist' field for track analysis** - it properly combines track and artist
+- **NEVER group by 'track_name' alone** - this can miss duplicates and variations
+- The data has been cleaned to normalize track name variations (e.g., "Reelin' In The Years" vs "Reeling in the Years")
+- For accurate results: df.groupby('track_artist')['hours_played'].sum()
 
 YOUR CAPABILITIES:
 ✅ **Complex Data Analysis**: You CAN perform advanced filtering, grouping, time-series analysis
@@ -128,7 +137,8 @@ CRITICAL INSTRUCTIONS:
 5. **JUST THE FACTS**: Give specific numbers and insights without explaining how you got them
 6. **USE df_full BY DEFAULT**, switch to df_filtered for questions where it's important to use the filtered dataset
 7. **NO CODE OR CHARTS**: Never generate visualizations or show code
-8. **DEFAULT TO LISETNING TIME RATHER THAN PLAYRS** when asked for top artists, tracks or trends default to listening time.
+8. **DEFAULT TO LISTENING TIME RATHER THAN PLAYS** when asked for top artists, tracks or trends default to listening time.
+9. **USE TRACK_ARTIST FIELD**: Always use 'track_artist' for track analysis, never 'track_name' alone
 
 FORBIDDEN PHRASES:
 ❌ "requires accessing", "needs to be filtered", "after filtering", "determining", "unfortunately"
@@ -141,28 +151,13 @@ RESPONSE STYLE:
 ✅ Include specific numbers and fun insights
 ✅ Use casual language and personality
 
-RESPONSE EXAMPLES:
+EXAMPLE TRACK ANALYSIS CODE (when showing work):
+```python
+# CORRECT way to find top tracks
+top_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+```
 
-**❌ BAD (what you DON'T want):**
-User: "What was my most listened-to album in 2022?"
-AI: "Determining your most listened-to album in 2022 requires accessing the full dataset and filtering..."
-
-**✅ GOOD (what you DO want):**
-User: "What was my most listened-to album in 2022?"
-AI: "Your most listened-to album in 2022 was 'Aja' by Steely Dan with 317 plays! You were totally obsessed with that one."
-
-**More Examples:**
-
-User: "Songs I played a lot in 2024 but haven't listened to much in 2025"
-AI: "Oh wow, you've really moved on from some songs! 'Song Title 1' by Artist went from 89 plays in 2024 to just 3 plays this year - that's a 97% drop! 'Song Title 2' also fell hard from 72 to 8 plays. Looks like you had 15 songs you were obsessed with in 2024 (50+ plays each) that you've barely touched in 2025. Your taste has definitely evolved!"
-
-User: "What's my most played song?"
-AI: "'Song Title' by Artist Name is your absolute favorite with 127 plays and 8.5 hours of listening time! That's 2.3% of all your music time in this period."
-
-User: "How do my weekends compare to weekdays?"
-AI: "You're a weekend music lover! You listen 40% more on weekends (3.2 hours daily) compared to weekdays (2.3 hours). Plus your weekend vibe is totally different - more pop and electronic, while weekdays you're into indie and alternative stuff."
-
-CORE RULE: Jump straight to the fun insights with real numbers. Be enthusiastic and conversational. NO methodology talk!"""
+CORE RULE: Jump straight to the fun insights with real numbers. Be enthusiastic and conversational. NO methodology talk unless explicitly asked to show work!"""
 
 def execute_ai_code(code, df_filtered, df_full=None):
     """Safely execute AI-generated code"""
@@ -185,6 +180,32 @@ def execute_ai_code(code, df_filtered, df_full=None):
         return True, None
     except Exception as e:
         return False, f"Error executing code: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+
+def clean_track_name(track_name):
+    """Clean and normalize track names for better matching"""
+    if pd.isna(track_name) or track_name == 'Unknown Track':
+        return track_name
+    
+    # Remove extra whitespace and normalize
+    cleaned = str(track_name).strip()
+    
+    # Common normalizations for track name variations
+    cleaned = re.sub(r"[''']", "'", cleaned)  # Normalize apostrophes
+    cleaned = re.sub(r"\s+", " ", cleaned)    # Multiple spaces to single space
+    cleaned = re.sub(r"[\u00A0\u2000-\u200B\u2028\u2029\u202F\u205F\u3000]", " ", cleaned)  # Various unicode spaces
+    
+    return cleaned
+
+def clean_artist_name(artist_name):
+    """Clean and normalize artist names for better matching"""
+    if pd.isna(artist_name) or artist_name == 'Unknown Artist':
+        return artist_name
+    
+    # Remove extra whitespace and normalize
+    cleaned = str(artist_name).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)    # Multiple spaces to single space
+    
+    return cleaned
 
 def create_chat_interface(df, df_filtered):
     """Create the chat interface in sidebar"""
@@ -355,13 +376,37 @@ def load_spotify_data():
     df['minutes_played'] = df['ms_played'] / 60000
     df['hours_played'] = df['minutes_played'] / 60
     
-    # Clean up track names and artist names
-    df['track_name'] = df['master_metadata_track_name'].fillna('Unknown Track')
-    df['artist_name'] = df['master_metadata_album_artist_name'].fillna('Unknown Artist')
+    # Clean up track names and artist names with normalization
+    df['track_name_raw'] = df['master_metadata_track_name'].fillna('Unknown Track')
+    df['artist_name_raw'] = df['master_metadata_album_artist_name'].fillna('Unknown Artist')
     df['album_name'] = df['master_metadata_album_album_name'].fillna('Unknown Album')
+    
+    # Apply cleaning functions
+    df['track_name'] = df['track_name_raw'].apply(clean_track_name)
+    df['artist_name'] = df['artist_name_raw'].apply(clean_artist_name)
+    
+    # Create the combined track_artist field using cleaned names
+    df['track_artist'] = df['track_name'] + " - " + df['artist_name']
     
     # Filter out very short plays (less than 30 seconds)
     df = df[df['ms_played'] >= 30000]
+    
+    # Add data quality insights
+    duplicates_detected = []
+    track_variations = df.groupby(['track_name', 'artist_name'])['track_name_raw'].unique()
+    for (track, artist), raw_names in track_variations.items():
+        if len(raw_names) > 1:
+            duplicates_detected.append({
+                'cleaned_name': f"{track} - {artist}",
+                'variations': list(raw_names)
+            })
+    
+    # Store data quality info in session state for optional display
+    if duplicates_detected:
+        st.session_state.data_quality_info = {
+            'duplicates_detected': len(duplicates_detected),
+            'examples': duplicates_detected[:5]  # Show first 5 examples
+        }
     
     return df
 
@@ -497,7 +542,6 @@ def create_top_artists_tracks(df):
                 
                 # Display as a dataframe with custom styling
                 if len(artist_data) > 0:
-                    import pandas as pd
                     artist_df = pd.DataFrame(artist_data)
                     
                     # Use st.dataframe with height parameter for scrolling
@@ -510,7 +554,7 @@ def create_top_artists_tracks(df):
     
     with col2:
         st.subheader("🎵 Top Tracks")
-        df['track_artist'] = df['track_name'] + " - " + df['artist_name']
+        # track_artist field is now created in load_spotify_data function
         all_tracks = df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
         top_tracks = all_tracks.head(15)
         
@@ -561,7 +605,6 @@ def create_top_artists_tracks(df):
                 
                 # Display as a dataframe with custom styling
                 if len(track_data) > 0:
-                    import pandas as pd
                     track_df = pd.DataFrame(track_data)
                     
                     # Use st.dataframe with height parameter for scrolling
@@ -1107,6 +1150,19 @@ def main():
         df = load_spotify_data()
         st.success(f"Successfully loaded {len(df):,} listening records from {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
         
+        # Show data quality information if available
+        if hasattr(st.session_state, 'data_quality_info'):
+            quality_info = st.session_state.data_quality_info
+            with st.expander(f"🔧 Data Quality: {quality_info['duplicates_detected']} track name variations detected and cleaned"):
+                st.write("**Track name variations that were normalized:**")
+                for example in quality_info['examples']:
+                    st.write(f"**{example['cleaned_name']}**")
+                    st.write(f"   Original variations: {', '.join([f'"{name}"' for name in example['variations']])}")
+                    st.write("")
+                if quality_info['duplicates_detected'] > 5:
+                    st.write(f"... and {quality_info['duplicates_detected'] - 5} more variations cleaned")
+                st.info("💡 This normalization ensures accurate track statistics in both the dashboard and AI chat.")
+        
         # Filters section
         st.markdown("### 🎛️ Filters")
         
@@ -1222,6 +1278,37 @@ def main():
         create_overview_metrics(df_filtered)
         st.markdown("---")
         
+        # Add track analysis debugging tool
+        with st.expander("🔍 Track Analysis Debug Tool"):
+            st.write("**Search for track variations and duplicates:**")
+            search_term = st.text_input("Enter part of a track or artist name:", key="track_search")
+            if search_term:
+                # Search in both original and cleaned names
+                matches = df[
+                    df['track_name'].str.contains(search_term, case=False, na=False) |
+                    df['artist_name'].str.contains(search_term, case=False, na=False) |
+                    df['track_name_raw'].str.contains(search_term, case=False, na=False) |
+                    df['artist_name_raw'].str.contains(search_term, case=False, na=False)
+                ]
+                
+                if len(matches) > 0:
+                    # Show track statistics
+                    track_stats = matches.groupby('track_artist').agg({
+                        'hours_played': 'sum',
+                        'track_name_raw': 'unique',
+                        'artist_name_raw': 'unique'
+                    }).sort_values('hours_played', ascending=False)
+                    
+                    st.write(f"**Found {len(track_stats)} matching tracks:**")
+                    for track_artist, row in track_stats.head(10).iterrows():
+                        st.write(f"**{track_artist}** - {row['hours_played']:.1f} hours")
+                        if len(row['track_name_raw']) > 1 or len(row['artist_name_raw']) > 1:
+                            st.write(f"   Original variations: Track: {list(row['track_name_raw'])}, Artist: {list(row['artist_name_raw'])}")
+                else:
+                    st.write("No matches found.")
+        
+        st.markdown("---")
+        
         # Create visualizations
         create_listening_timeline(df_filtered)
         st.markdown("---")
@@ -1245,6 +1332,93 @@ def main():
         st.markdown("---")
         
         create_artist_wordcloud(df_filtered)
+        
+        # Data Export Section
+        st.markdown("---")
+        st.subheader("💾 Export Data")
+        
+        # Create export options
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**📊 Full Dataset**")
+            st.write(f"Total records: {len(df):,}")
+            st.write(f"Date range: {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
+            
+            # Convert full dataframe to CSV
+            csv_full = df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Full Dataset (CSV)",
+                data=csv_full,
+                file_name=f"spotify_full_data_{df['ts'].min().strftime('%Y%m%d')}_{df['ts'].max().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                help="Download complete Spotify listening history as CSV file"
+            )
+            
+            # Convert to Excel (requires openpyxl)
+            try:
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                    df.to_excel(writer, sheet_name='Full_Data', index=False)
+                    
+                excel_full = buffer.getvalue()
+                st.download_button(
+                    label="📥 Download Full Dataset (Excel)",
+                    data=excel_full,
+                    file_name=f"spotify_full_data_{df['ts'].min().strftime('%Y%m%d')}_{df['ts'].max().strftime('%Y%m%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    help="Download complete Spotify listening history as Excel file"
+                )
+            except ImportError:
+                st.info("📝 Install openpyxl to enable Excel download: `pip install openpyxl`")
+        
+        with col2:
+            st.markdown("**🎯 Filtered Dataset**")
+            st.write(f"Filtered records: {len(df_filtered):,}")
+            if len(df_filtered) > 0:
+                st.write(f"Date range: {df_filtered['ts'].min().strftime('%Y-%m-%d')} to {df_filtered['ts'].max().strftime('%Y-%m-%d')}")
+            
+            # Convert filtered dataframe to CSV
+            csv_filtered = df_filtered.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Filtered Data (CSV)",
+                data=csv_filtered,
+                file_name=f"spotify_filtered_data_{df_filtered['ts'].min().strftime('%Y%m%d') if len(df_filtered) > 0 else 'empty'}_{df_filtered['ts'].max().strftime('%Y%m%d') if len(df_filtered) > 0 else 'empty'}.csv",
+                mime="text/csv",
+                help="Download currently filtered data as CSV file",
+                disabled=(len(df_filtered) == 0)
+            )
+            
+            # Convert filtered data to Excel
+            try:
+                if len(df_filtered) > 0:
+                    buffer_filtered = io.BytesIO()
+                    with pd.ExcelWriter(buffer_filtered, engine='openpyxl') as writer:
+                        df_filtered.to_excel(writer, sheet_name='Filtered_Data', index=False)
+                        
+                    excel_filtered = buffer_filtered.getvalue()
+                    st.download_button(
+                        label="📥 Download Filtered Data (Excel)",
+                        data=excel_filtered,
+                        file_name=f"spotify_filtered_data_{df_filtered['ts'].min().strftime('%Y%m%d')}_{df_filtered['ts'].max().strftime('%Y%m%d')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        help="Download currently filtered data as Excel file"
+                    )
+                else:
+                    st.button("📥 Download Filtered Data (Excel)", disabled=True, help="No data available with current filters")
+            except ImportError:
+                st.info("📝 Install openpyxl to enable Excel download: `pip install openpyxl`")
+        
+        # Additional export options
+        st.markdown("**📋 Data Columns Included:**")
+        st.write(", ".join(df.columns.tolist()))
+        
+        # Show a sample of the data structure
+        with st.expander("🔍 Preview Data Structure"):
+            st.write("**First 5 rows of dataset:**")
+            st.dataframe(df.head(), use_container_width=True)
+        
+        st.markdown("---")
         
         # Data table
         if st.checkbox("Show Raw Data"):
