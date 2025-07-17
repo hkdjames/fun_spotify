@@ -7,6 +7,7 @@ import json
 import os
 import zipfile
 import io
+import glob
 from datetime import datetime, timedelta
 import numpy as np
 from wordcloud import WordCloud
@@ -207,6 +208,8 @@ def execute_ai_code(code, df_filtered, df_full=None):
         # Pre-compute common analysis results to prevent undefined variable errors
         top_tracks_by_hours = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False) if df_full is not None else None
         top_artists_by_hours = df_full.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False) if df_full is not None else None
+        all_tracks = top_tracks_by_hours  # Alias for compatibility
+        all_artists = top_artists_by_hours  # Alias for compatibility
         
         # Create a restricted namespace with pre-computed helpers
         namespace = {
@@ -222,6 +225,8 @@ def execute_ai_code(code, df_filtered, df_full=None):
             # Pre-computed helpers to prevent undefined variable errors
             'top_tracks_by_hours': top_tracks_by_hours,
             'top_artists_by_hours': top_artists_by_hours,
+            'all_tracks': all_tracks,
+            'all_artists': all_artists,
         }
         
         # Execute the code
@@ -315,12 +320,7 @@ GEMINI_API_KEY = "your-api-key-here"</code></pre>
             st.session_state.gemini_model = model
             st.success("✅ Gemini AI ready!")
     
-    # Show data context info
-    is_filtered = len(df_filtered) != len(df)
-    data_info = f"📊 **Current dataset:** {len(df_filtered):,} records"
-    if is_filtered:
-        data_info += f" (filtered from {len(df):,} total)"
-    st.caption(data_info)
+    # Data context for AI (no display)
     
     # Display chat messages
     for message in st.session_state.chat_messages:
@@ -575,16 +575,32 @@ def create_period_timeline_with_tabs(df):
         )
     
     with col2:
-        period_type = st.selectbox(
+        # Get available years from the data for monthly options
+        available_years = sorted(df['year'].unique(), reverse=True)
+        
+        # Create period options
+        period_options = ['Yearly'] + [f"{year} (Monthly)" for year in available_years]
+        
+        selected_period = st.selectbox(
             "📅 Time Period Granularity",
-            options=['year', 'month'],
-            format_func=lambda x: "Year" if x == 'year' else "Year + Month",
+            options=period_options,
             key="main_period_type"
         )
     
+    # Determine period type and year filter
+    if selected_period == 'Yearly':
+        period_type = 'year'
+        year_filter = None
+    else:
+        period_type = 'month'
+        year_filter = int(selected_period.split(' ')[0])  # Extract year from "2024 (Monthly)"
+    
+    # Filter data by year if monthly view is selected
+    df_period = df[df['year'] == year_filter] if year_filter else df
+    
     # Calculate period statistics
     with st.spinner("Calculating timeline data..."):
-        period_data, periods = calculate_period_stats(df, period_type)
+        period_data, periods = calculate_period_stats(df_period, period_type)
     
     if not period_data:
         st.warning("No data available for the selected time period")
@@ -647,8 +663,8 @@ def create_period_timeline_with_tabs(df):
         
         # Calculate dominant content and period-specific trends
         with st.spinner("Identifying period-specific trends..."):
-            dominant_artists, dominant_tracks = identify_dominant_content(df, exclusion_depth, period_type)
-            filtered_period_data, _ = calculate_period_specific_trends(df, dominant_artists, dominant_tracks, period_type)
+            dominant_artists, dominant_tracks = identify_dominant_content(df_period, exclusion_depth, period_type)
+            filtered_period_data, _ = calculate_period_specific_trends(df_period, dominant_artists, dominant_tracks, period_type)
         
         # Show what's being excluded
         with st.expander(f"🚫 Excluded Content (Top {exclusion_depth} Dominant)"):
@@ -776,6 +792,77 @@ def process_spotify_data(uploaded_files):
     df = pd.DataFrame(all_data)
     
     # Data preprocessing
+    df['ts'] = pd.to_datetime(df['ts'])
+    df['date'] = df['ts'].dt.date
+    df['hour'] = df['ts'].dt.hour
+    df['day_of_week'] = df['ts'].dt.day_name()
+    df['month'] = df['ts'].dt.month_name()
+    df['year'] = df['ts'].dt.year
+    df['minutes_played'] = df['ms_played'] / 60000
+    df['hours_played'] = df['minutes_played'] / 60
+    
+    # Clean up track names and artist names with normalization
+    df['track_name_raw'] = df['master_metadata_track_name'].fillna('Unknown Track')
+    df['artist_name_raw'] = df['master_metadata_album_artist_name'].fillna('Unknown Artist')
+    df['album_name'] = df['master_metadata_album_album_name'].fillna('Unknown Album')
+    
+    # Apply cleaning functions
+    df['track_name'] = df['track_name_raw'].apply(clean_track_name)
+    df['artist_name'] = df['artist_name_raw'].apply(clean_artist_name)
+    
+    # Create the combined track_artist field using cleaned names
+    df['track_artist'] = df['track_name'] + " - " + df['artist_name']
+    
+    # Filter out very short plays (less than 30 seconds)
+    df = df[df['ms_played'] >= 30000]
+    
+    # Add data quality insights
+    duplicates_detected = []
+    track_variations = df.groupby(['track_name', 'artist_name'])['track_name_raw'].unique()
+    for (track, artist), raw_names in track_variations.items():
+        if len(raw_names) > 1:
+            duplicates_detected.append({
+                'cleaned_name': f"{track} - {artist}",
+                'variations': list(raw_names)
+            })
+    
+    # Store data quality info in session state for optional display
+    if duplicates_detected:
+        st.session_state.data_quality_info = {
+            'duplicates_detected': len(duplicates_detected),
+            'examples': duplicates_detected[:5]  # Show first 5 examples
+        }
+    
+    return df
+
+def load_raw_data():
+    """Load data from raw_data directory as fallback"""
+    data_dir = "raw_data"
+    json_files = glob.glob(os.path.join(data_dir, "Streaming_History_Audio_*.json"))
+    
+    if not json_files:
+        st.error("No Spotify data files found in the 'raw_data' directory.")
+        return None
+    
+    all_data = []
+    
+    with st.spinner("Loading Spotify data from raw_data..."):
+        for file in json_files:
+            try:
+                with open(file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    all_data.extend(data)
+            except Exception as e:
+                st.error(f"Error reading {file}: {str(e)}")
+                return None
+    
+    if not all_data:
+        st.error("No data found in raw_data files.")
+        return None
+    
+    df = pd.DataFrame(all_data)
+    
+    # Data preprocessing (same as process_spotify_data)
     df['ts'] = pd.to_datetime(df['ts'])
     df['date'] = df['ts'].dt.date
     df['hour'] = df['ts'].dt.hour
@@ -1556,43 +1643,120 @@ def main():
             help="Upload individual JSON files OR a ZIP file containing all your Spotify JSON files."
         )
         
+        # Show current data source status
+        if 'data_source' in st.session_state:
+            if st.session_state.data_source == 'raw_data':
+                st.success("Using local raw_data files")
+            elif st.session_state.data_source == 'uploaded':
+                st.success("Using uploaded files")
+        
+        # Check for raw_data fallback
+        use_raw_data = False
         if not uploaded_files:
-            st.info("👆 Upload your files to start")
-            with st.expander("How to get Spotify data"):
-                st.markdown("""
-                1. Go to [Spotify Privacy Settings](https://www.spotify.com/account/privacy/)
-                2. Request **Extended Streaming History**
-                3. Wait up to 30 days for email
-                4. Download ZIP file
-                5. Upload ZIP or extract & upload JSONs
-                """)
+            # Check if raw_data directory exists with files
+            data_dir = "raw_data"
+            raw_json_files = glob.glob(os.path.join(data_dir, "Streaming_History_Audio_*.json"))
+            
+            if raw_json_files:
+                use_raw_data = st.button(
+                    f"📂 Use Local Data ({len(raw_json_files)} files found)",
+                    help="Load data from raw_data directory instead of uploading"
+                )
+                
+                # Add option to clear current data and upload new files
+                if 'spotify_data' in st.session_state:
+                    if st.button("🔄 Clear Data & Upload New Files"):
+                        # Clear all session state data
+                        for key in ['spotify_data', 'data_source', 'uploaded_files', 'data_quality_info']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.rerun()
+            else:
+                st.info("👆 Upload your files to start")
+                with st.expander("How to get Spotify data"):
+                    st.markdown("""
+                    1. Go to [Spotify Privacy Settings](https://www.spotify.com/account/privacy/)
+                    2. Request **Extended Streaming History**
+                    3. Wait up to 30 days for email
+                    4. Download ZIP file
+                    5. Upload ZIP or extract & upload JSONs
+                    """)
+        else:
+            # If files are uploaded but we have existing data, give option to use new files
+            if 'spotify_data' in st.session_state:
+                if st.button("🔄 Use These New Files"):
+                    # Clear existing data to force reload
+                    for key in ['spotify_data', 'data_source', 'uploaded_files']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.rerun()
         
         st.markdown("---")
         
-        # Add toggle for chat interface
-        chat_enabled = st.checkbox("🤖 Enable AI Chat", value=True, key="chat_toggle")
+        # Chat interface is always enabled
+        st.markdown("### 🤖 AI Chat")
         
-        if chat_enabled:
-            st.markdown("---")
+        st.markdown("---")
     
     # Header
     st.title("🎵 Spotify Listening History Dashboard")
     
-    # Check if data is uploaded
-    if not uploaded_files:
-        st.info("👈 Please upload your Spotify data files in the sidebar to get started!")
-        st.stop()
-    
-    # Process uploaded data
+    # Robust session state management - prioritize existing data
     try:
-        df = process_spotify_data(uploaded_files)
+        # Check if we already have data loaded
+        if 'spotify_data' in st.session_state:
+            # We have existing data, use it
+            df = st.session_state.spotify_data
+            reload_data = False
+            
+            # Only reload if explicitly requested or data source changes
+            if use_raw_data and st.session_state.get('data_source') != 'raw_data':
+                df = load_raw_data()
+                if df is not None:
+                    st.session_state.spotify_data = df
+                    st.session_state.data_source = 'raw_data'
+                    reload_data = True
+            elif uploaded_files:
+                uploaded_file_names = [f.name for f in uploaded_files]
+                if st.session_state.get('uploaded_files') != uploaded_file_names:
+                    df = process_spotify_data(uploaded_files)
+                    if df is not None:
+                        st.session_state.spotify_data = df
+                        st.session_state.data_source = 'uploaded'
+                        st.session_state.uploaded_files = uploaded_file_names
+                        reload_data = True
+        else:
+            # No existing data, need to load
+            reload_data = True
+            
+            if use_raw_data:
+                df = load_raw_data()
+                if df is not None:
+                    st.session_state.spotify_data = df
+                    st.session_state.data_source = 'raw_data'
+            elif uploaded_files:
+                df = process_spotify_data(uploaded_files)
+                if df is not None:
+                    st.session_state.spotify_data = df
+                    st.session_state.data_source = 'uploaded'
+                    st.session_state.uploaded_files = [f.name for f in uploaded_files]
+            else:
+                # No data source available
+                st.info("👈 Please upload your Spotify data files in the sidebar to get started!")
+                st.stop()
+        
         if df is None:
             st.stop()
         
-        # Move success messages to sidebar
+        # Move success messages to sidebar (only when data is newly loaded)
         with st.sidebar:
-            st.success(f"✅ {len(df):,} records loaded")
-            st.caption(f"From {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
+            if reload_data:
+                st.success(f"✅ {len(df):,} records loaded")
+                st.caption(f"From {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
+            else:
+                # Show persistent status without success message
+                st.info(f"📊 {len(df):,} records ready")
+                st.caption(f"From {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
             
             # Show data quality information in sidebar if available
             if hasattr(st.session_state, 'data_quality_info'):
@@ -1611,10 +1775,9 @@ def main():
         df_filtered = df
 
         
-        # Add chat interface to sidebar if enabled
-        if chat_enabled:
-            with st.sidebar:
-                create_chat_interface(df, df_filtered)
+        # Add chat interface to sidebar (always enabled)
+        with st.sidebar:
+            create_chat_interface(df, df_filtered)
         
 
         
