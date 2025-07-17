@@ -4,8 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import json
-import glob
 import os
+import zipfile
+import io
 from datetime import datetime, timedelta
 import numpy as np
 from wordcloud import WordCloud
@@ -392,25 +393,385 @@ GEMINI_API_KEY = "your-api-key-here"</code></pre>
             st.session_state.chat_messages = []
             st.rerun()
 
-@st.cache_data
-def load_spotify_data():
-    """Load and combine all Spotify JSON files"""
-    data_dir = "raw_data"
-    json_files = glob.glob(os.path.join(data_dir, "Streaming_History_Audio_*.json"))
+# Timeline Analysis Functions
+def calculate_period_stats(df, period_type='year'):
+    """Calculate top artists, tracks, and albums by time period"""
+    # Make a copy to avoid modifying the original dataframe
+    df_copy = df.copy()
+    if period_type == 'year':
+        df_copy['period'] = df_copy['year'].astype(str)
+    else:  # year+month
+        df_copy['period'] = df_copy['ts'].dt.strftime('%Y-%m')
     
+    # Calculate stats for each period
+    periods = sorted(df_copy['period'].unique())
+    period_data = {}
+    
+    for period in periods:
+        period_df = df_copy[df_copy['period'] == period]
+        
+        # Top artists by hours
+        top_artists = period_df.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False).head(10)
+        
+        # Top tracks by hours  
+        top_tracks = period_df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False).head(10)
+        
+        # Top albums by hours
+        top_albums = period_df.groupby(['album_name', 'artist_name'])['hours_played'].sum().sort_values(ascending=False).head(10)
+        
+        period_data[period] = {
+            'artists': [(name, hours) for name, hours in top_artists.items()],
+            'tracks': [(name, hours) for name, hours in top_tracks.items()],
+            'albums': [(f"{album} - {artist}", hours) for (album, artist), hours in top_albums.items()],
+            'total_hours': period_df['hours_played'].sum(),
+            'total_plays': len(period_df)
+        }
+    
+    return period_data, periods
+
+def identify_dominant_content(df, top_n=10, period_type='year'):
+    """Identify dominant artists and tracks by overall listening hours across all periods"""
+    
+    # Simple approach: get top N artists and tracks by total hours across entire dataset
+    # This is more straightforward and allows for any exclusion depth the user wants
+    
+    # Get top artists by total listening hours
+    top_artists_by_hours = df.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False)
+    dominant_artists = top_artists_by_hours.head(top_n).index.tolist()
+    
+    # Get top tracks by total listening hours
+    top_tracks_by_hours = df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+    dominant_tracks = top_tracks_by_hours.head(top_n).index.tolist()
+    
+    return dominant_artists, dominant_tracks
+
+def calculate_period_specific_trends(df, dominant_artists, dominant_tracks, period_type='year'):
+    """Calculate period-specific trends excluding dominant content"""
+    period_stats, periods = calculate_period_stats(df, period_type)
+    
+    # Make a copy and add period column
+    df_copy = df.copy()
+    if period_type == 'year':
+        df_copy['period'] = df_copy['year'].astype(str)
+    else:  # year+month
+        df_copy['period'] = df_copy['ts'].dt.strftime('%Y-%m')
+    
+    # Create filtered period data excluding dominant content
+    filtered_period_data = {}
+    
+    for period in periods:
+        period_df = df_copy[df_copy['period'] == period]
+        
+        # Filter out dominant artists
+        period_df_filtered = period_df[~period_df['artist_name'].isin(dominant_artists)]
+        
+        # Get period-specific top artists
+        period_artists = period_df_filtered.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False).head(10)
+        
+        # Filter out dominant tracks
+        period_df_tracks_filtered = period_df[~period_df['track_artist'].isin(dominant_tracks)]
+        
+        # Get period-specific top tracks
+        period_tracks = period_df_tracks_filtered.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False).head(10)
+        
+        # Albums (less likely to be dominant, so lighter filtering)
+        period_albums = period_df_filtered.groupby(['album_name', 'artist_name'])['hours_played'].sum().sort_values(ascending=False).head(10)
+        
+        filtered_period_data[period] = {
+            'artists': [(name, hours) for name, hours in period_artists.items()],
+            'tracks': [(name, hours) for name, hours in period_tracks.items()],
+            'albums': [(f"{album} - {artist}", hours) for (album, artist), hours in period_albums.items()],
+            'total_hours': period_df['hours_played'].sum(),
+            'total_plays': len(period_df)
+        }
+    
+    return filtered_period_data, periods
+
+def create_treemap_chart(period_data, period, content_type, color_scheme='blues'):
+    """Create a treemap chart for a specific time period and content type"""
+    
+    if period not in period_data or not period_data[period][content_type]:
+        return None
+    
+    content_list = period_data[period][content_type]
+    total_hours = sum([hours for _, hours in content_list])
+    
+    if total_hours == 0:
+        return None
+    
+    # Prepare data for treemap chart
+    names = []
+    values = []
+    labels = []
+    colors_list = []
+    hover_names = []  # Full names for hover
+    
+    # Color palettes - using medium shades for better text contrast
+    if color_scheme == 'blues':
+        base_colors = ['#4292c6', '#6baed6', '#9ecae1', '#c6dbef', '#deebf7', '#e1edf8', '#f0f7ff']
+    else:  # oranges
+        base_colors = ['#fd8d3c', '#fdae6b', '#fdd0a2', '#feedde', '#fef0d9', '#fff2e6', '#fff5eb']
+    
+    for rank, (name, hours) in enumerate(content_list, 1):
+        percentage = (hours / total_hours) * 100
+        
+        # Create short display name for treemap
+        short_name = name if len(name) <= 20 else name[:17] + "..."
+        label = f"#{rank}<br>{short_name}<br>{hours:.1f}h"
+        
+        names.append(name)
+        values.append(hours)
+        labels.append(label)
+        hover_names.append(name)  # Store full name for hover
+        
+        # Assign color based on rank
+        color_idx = min(rank - 1, len(base_colors) - 1)
+        colors_list.append(base_colors[color_idx])
+    
+    # Create treemap using graph_objects for better control
+    fig = go.Figure(go.Treemap(
+        labels=labels,
+        values=values,
+        parents=[""] * len(values),  # All items are at root level
+        customdata=hover_names,  # Pass full names for hover
+        marker=dict(
+            colors=colors_list,
+            line=dict(width=2, color='white')
+        ),
+        textfont=dict(size=14, color='black', family='Arial Black'),  # Larger, bold text
+        textposition='middle center',
+        hovertemplate='<b>%{customdata}</b><br>' +  # Use full name from customdata
+                     'Hours: %{value:.1f}<br>' +
+                     'Percentage: %{percentParent}<br>' +
+                     '<extra></extra>'
+    ))
+    
+    # Customize layout
+    fig.update_layout(
+        height=400,
+        margin=dict(l=5, r=5, t=10, b=5),
+        font=dict(size=10)
+    )
+    
+    return fig
+
+def create_period_timeline_with_tabs(df):
+    """Create the new timeline interface with content selector and tabs"""
+    st.header("📈 Timeline Analysis: Your Music Through Time")
+    
+    # Content type and period selectors
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        content_type = st.selectbox(
+            "📊 Content Type",
+            options=['artists', 'tracks', 'albums'],
+            format_func=lambda x: {
+                'artists': '🎤 Artists',
+                'tracks': '🎵 Tracks', 
+                'albums': '💿 Albums'
+            }[x],
+            key="content_type_selector"
+        )
+    
+    with col2:
+        period_type = st.selectbox(
+            "📅 Time Period Granularity",
+            options=['year', 'month'],
+            format_func=lambda x: "Year" if x == 'year' else "Year + Month",
+            key="main_period_type"
+        )
+    
+    # Calculate period statistics
+    with st.spinner("Calculating timeline data..."):
+        period_data, periods = calculate_period_stats(df, period_type)
+    
+    if not period_data:
+        st.warning("No data available for the selected time period")
+        return
+    
+    # Display summary info
+    st.write(f"**Found {len(periods)} time periods** from **{periods[0]}** to **{periods[-1]}**")
+    
+    # Create tabs for All Music vs Period-Specific Discovery
+    tab1, tab2 = st.tabs(["🎵 All Music", "🔍 Period-Specific Discovery"])
+    
+    with tab1:
+        st.subheader(f"Top {content_type.title()} by Time Period")
+        st.write("*Showing your most listened to content for each time period*")
+        
+        # Display Marimekko charts for each period (vertically scrollable)
+        for period in periods:
+            st.markdown(f"### {period}")
+            
+            # Get total hours for context
+            total_hours = period_data[period]['total_hours']
+            total_plays = period_data[period]['total_plays']
+            
+            col1, col2 = st.columns([3, 1])
+            
+            with col2:
+                st.metric("Total Hours", f"{total_hours:.1f}")
+                st.metric("Total Plays", f"{total_plays:,}")
+            
+            with col1:
+                # Create treemap chart for this period
+                fig = create_treemap_chart(period_data, period, content_type, 'blues')
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info(f"No {content_type} data for {period}")
+            
+            st.markdown("---")
+    
+    with tab2:
+        st.subheader(f"Period-Specific {content_type.title()} Discovery")
+        st.write("*Showing content that was uniquely popular in specific time periods*")
+        
+        # Controls for dominant content exclusion
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            exclusion_depth = st.slider(
+                "🎯 Exclusion Depth",
+                min_value=5,
+                max_value=500,
+                value=10,
+                step=5,
+                help="Number of top items to exclude (those that dominate across multiple periods)",
+                key="exclusion_depth"
+            )
+        
+        with col2:
+            st.info(f"Excluding top **{exclusion_depth}** most dominant {content_type}")
+        
+        # Calculate dominant content and period-specific trends
+        with st.spinner("Identifying period-specific trends..."):
+            dominant_artists, dominant_tracks = identify_dominant_content(df, exclusion_depth, period_type)
+            filtered_period_data, _ = calculate_period_specific_trends(df, dominant_artists, dominant_tracks, period_type)
+        
+        # Show what's being excluded
+        with st.expander(f"🚫 Excluded Content (Top {exclusion_depth} Dominant)"):
+            if content_type == 'artists':
+                st.write(f"**Excluded Artists ({len(dominant_artists)} total):**")
+                # Create scrollable dataframe for full list
+                artists_df = pd.DataFrame({
+                    'Rank': range(1, len(dominant_artists) + 1),
+                    'Artist': dominant_artists
+                })
+                st.dataframe(
+                    artists_df,
+                    use_container_width=True,
+                    height=min(400, len(dominant_artists) * 35 + 50),  # Dynamic height with max
+                    hide_index=True
+                )
+            elif content_type == 'tracks':
+                st.write(f"**Excluded Tracks ({len(dominant_tracks)} total):**")
+                # Create scrollable dataframe for full list
+                tracks_df = pd.DataFrame({
+                    'Rank': range(1, len(dominant_tracks) + 1),
+                    'Track': dominant_tracks
+                })
+                st.dataframe(
+                    tracks_df,
+                    use_container_width=True,
+                    height=min(400, len(dominant_tracks) * 35 + 50),  # Dynamic height with max
+                    hide_index=True
+                )
+            else:  # albums
+                st.write("**Excluded based on artist filtering:**")
+                st.write(f"Albums by the top {exclusion_depth} most dominant artists are de-prioritized")
+                # Show the excluded artists for reference
+                artists_df = pd.DataFrame({
+                    'Rank': range(1, len(dominant_artists) + 1),
+                    'Excluded Artist': dominant_artists
+                })
+                st.dataframe(
+                    artists_df,
+                    use_container_width=True,
+                    height=min(300, len(dominant_artists) * 35 + 50),  # Smaller height for albums
+                    hide_index=True
+                )
+        
+        # Display period-specific Marimekko charts
+        for period in periods:
+            st.markdown(f"### {period}")
+            
+            # Get total hours for context
+            if period in filtered_period_data:
+                total_hours = filtered_period_data[period]['total_hours']
+                total_plays = filtered_period_data[period]['total_plays']
+                
+                col1, col2 = st.columns([3, 1])
+                
+                with col2:
+                    st.metric("Total Hours", f"{total_hours:.1f}")
+                    st.metric("Total Plays", f"{total_plays:,}")
+                
+                with col1:
+                    # Create treemap chart for this period (orange color scheme)
+                    fig = create_treemap_chart(filtered_period_data, period, content_type, 'oranges')
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info(f"No period-specific {content_type} data for {period}")
+            else:
+                st.info(f"No data available for {period}")
+            
+            st.markdown("---")
+
+def process_spotify_data(uploaded_files):
+    """Process uploaded Spotify JSON files (individual or zipped) and return cleaned DataFrame"""
     all_data = []
     
-    # Check if JSON files exist
-    if not json_files:
-        st.error("No Spotify data files found in the 'raw_data' directory.")
-        st.info("Please upload your Spotify Extended Streaming History JSON files (Streaming_History_Audio_*.json)")
-        st.stop()
+    with st.spinner("Processing uploaded Spotify data..."):
+        for uploaded_file in uploaded_files:
+            file_extension = uploaded_file.name.lower().split('.')[-1]
+            
+            try:
+                if file_extension == 'zip':
+                    # Handle ZIP file
+                    with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
+                        json_files_in_zip = [f for f in zip_ref.namelist() if f.lower().endswith('.json') and 'streaming_history_audio' in f.lower()]
+                        
+                        if not json_files_in_zip:
+                            st.warning(f"⚠️ No Spotify JSON files found in {uploaded_file.name}. Looking for files containing 'Streaming_History_Audio'.")
+                            continue
+                        
+                        for json_filename in json_files_in_zip:
+                            try:
+                                with zip_ref.open(json_filename) as json_file:
+                                    data = json.load(json_file)
+                                    all_data.extend(data)
+                            except json.JSONDecodeError:
+                                st.error(f"❌ Error reading {json_filename} from {uploaded_file.name}. Please ensure it's a valid JSON file.")
+                                return None
+                            except Exception as e:
+                                st.error(f"❌ Error processing {json_filename} from {uploaded_file.name}: {str(e)}")
+                                return None
+                
+                elif file_extension == 'json':
+                    # Handle individual JSON file
+                    data = json.load(uploaded_file)
+                    all_data.extend(data)
+                
+                else:
+                    st.warning(f"⚠️ Skipping {uploaded_file.name} - only JSON and ZIP files are supported.")
+                    continue
+                    
+            except zipfile.BadZipFile:
+                st.error(f"❌ {uploaded_file.name} is not a valid ZIP file.")
+                return None
+            except json.JSONDecodeError:
+                st.error(f"❌ Error reading {uploaded_file.name}. Please ensure it's a valid JSON file.")
+                return None
+            except Exception as e:
+                st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
+                return None
     
-    with st.spinner("Loading Spotify data..."):
-        for file in json_files:
-            with open(file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                all_data.extend(data)
+    if not all_data:
+        st.error("No data found in uploaded files.")
+        return None
     
     df = pd.DataFrame(all_data)
     
@@ -602,7 +963,7 @@ def create_top_artists_tracks(df):
     
     with col2:
         st.subheader("🎵 Top Tracks")
-        # track_artist field is now created in load_spotify_data function
+        # track_artist field is now created in process_spotify_data function
         all_tracks = df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
         top_tracks = all_tracks.head(15)
         
@@ -1182,8 +1543,32 @@ def create_discovery_analysis(df):
     st.plotly_chart(fig, use_container_width=True)
 
 def main():
-    # Create sidebar with chat interface
+    # Create sidebar with upload and chat interface
     with st.sidebar:
+        # File upload section in sidebar
+        st.markdown("### 📁 Upload Data")
+        st.write("Upload your Spotify files:")
+        
+        uploaded_files = st.file_uploader(
+            "JSON files or ZIP",
+            type=["json", "zip"],
+            accept_multiple_files=True,
+            help="Upload individual JSON files OR a ZIP file containing all your Spotify JSON files."
+        )
+        
+        if not uploaded_files:
+            st.info("👆 Upload your files to start")
+            with st.expander("How to get Spotify data"):
+                st.markdown("""
+                1. Go to [Spotify Privacy Settings](https://www.spotify.com/account/privacy/)
+                2. Request **Extended Streaming History**
+                3. Wait up to 30 days for email
+                4. Download ZIP file
+                5. Upload ZIP or extract & upload JSONs
+                """)
+        
+        st.markdown("---")
+        
         # Add toggle for chat interface
         chat_enabled = st.checkbox("🤖 Enable AI Chat", value=True, key="chat_toggle")
         
@@ -1193,153 +1578,37 @@ def main():
     # Header
     st.title("🎵 Spotify Listening History Dashboard")
     
-    # Load data
+    # Check if data is uploaded
+    if not uploaded_files:
+        st.info("👈 Please upload your Spotify data files in the sidebar to get started!")
+        st.stop()
+    
+    # Process uploaded data
     try:
-        df = load_spotify_data()
-        st.success(f"Successfully loaded {len(df):,} listening records from {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
+        df = process_spotify_data(uploaded_files)
+        if df is None:
+            st.stop()
         
-        # Show data quality information if available
-        if hasattr(st.session_state, 'data_quality_info'):
-            quality_info = st.session_state.data_quality_info
-            with st.expander(f"🔧 Data Quality: {quality_info['duplicates_detected']} track name variations detected and cleaned"):
-                st.write("**Track name variations that were normalized:**")
-                for example in quality_info['examples']:
-                    st.write(f"**{example['cleaned_name']}**")
-                    variations_text = ', '.join([f'"{name}"' for name in example['variations']])
-                    st.write(f"   Original variations: {variations_text}")
-                    st.write("")
-                if quality_info['duplicates_detected'] > 5:
-                    st.write(f"... and {quality_info['duplicates_detected'] - 5} more variations cleaned")
-                st.info("💡 This normalization ensures accurate track statistics in both the dashboard and AI chat.")
+        # Move success messages to sidebar
+        with st.sidebar:
+            st.success(f"✅ {len(df):,} records loaded")
+            st.caption(f"From {df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}")
+            
+            # Show data quality information in sidebar if available
+            if hasattr(st.session_state, 'data_quality_info'):
+                quality_info = st.session_state.data_quality_info
+                with st.expander(f"🔧 Data Quality ({quality_info['duplicates_detected']} cleaned)"):
+                    st.write("Track name variations normalized:")
+                    for example in quality_info['examples']:
+                        st.write(f"**{example['cleaned_name']}**")
+                        variations_text = ', '.join([f'"{name}"' for name in example['variations']])
+                        st.write(f"   {variations_text}")
+                        st.write("")
+                    if quality_info['duplicates_detected'] > 5:
+                        st.write(f"... +{quality_info['duplicates_detected'] - 5} more")
         
-        # Add Dashboard vs AI Results Comparison
-        with st.expander("🔍 Dashboard vs AI Results Comparison"):
-            st.write("**Verify that dashboard and AI will get the same results:**")
-            
-            # Calculate top tracks using the exact same method as the dashboard
-            dashboard_top_tracks = df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False).head(10)
-            
-            st.write("**Top 10 tracks by listening time (what both dashboard and AI should show):**")
-            for i, (track_artist, hours) in enumerate(dashboard_top_tracks.items(), 1):
-                plays = len(df[df['track_artist'] == track_artist])
-                st.write(f"{i}. **{track_artist}** - {hours:.1f} hours ({plays} plays)")
-            
-            st.markdown("---")
-            st.write("**AI Validation Code:**")
-            st.code("""
-# This is the EXACT code Gemini should use:
-top_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
-print(f"#1 Most played track: {top_tracks.index[0]} with {top_tracks.iloc[0]:.1f} hours")
-
-# To check specific track:
-track = "Reelin' In The Years - Steely Dan"  # Replace with actual track
-hours = df_full[df_full['track_artist'] == track]['hours_played'].sum()
-plays = len(df_full[df_full['track_artist'] == track])
-print(f"{track}: {hours:.1f} hours, {plays} plays")
-            """, language="python")
-        
-        # Filters section
-        st.markdown("### 🎛️ Filters")
-        
-        # Create filter container
-        with st.container():
-            # Enhanced date range filter
-            min_date = df['date'].min()
-            max_date = df['date'].max()
-            
-            # Get available years from the data
-            available_years = sorted(df['year'].unique(), reverse=True)
-            year_options = [f"{year}" for year in available_years]
-            
-            # Quick date range presets
-            preset_options = [
-                "All Time",
-                "Last Year", 
-                "Last 6 Months",
-                "Last 3 Months", 
-                "Last Month",
-                "This Year"
-            ] + year_options + ["Custom Range"]
-            
-            # Date range controls in columns
-            col1, col2, col3 = st.columns([2, 3, 2])
-            
-            with col1:
-                preset_range = st.selectbox(
-                    "📅 Quick Select",
-                    options=preset_options,
-                    index=0,
-                    key="main_preset_range"
-                )
-            
-            # Calculate preset date ranges
-            today = pd.Timestamp.now().date()
-            current_year_start = pd.Timestamp(today.year, 1, 1).date()
-            
-            if preset_range == "All Time":
-                default_start, default_end = min_date, max_date
-            elif preset_range == "Last Year":
-                default_start = max(min_date, today - pd.Timedelta(days=365))
-                default_end = max_date
-            elif preset_range == "Last 6 Months":
-                default_start = max(min_date, today - pd.Timedelta(days=180))
-                default_end = max_date
-            elif preset_range == "Last 3 Months":
-                default_start = max(min_date, today - pd.Timedelta(days=90))
-                default_end = max_date
-            elif preset_range == "Last Month":
-                default_start = max(min_date, today - pd.Timedelta(days=30))
-                default_end = max_date
-            elif preset_range == "This Year":
-                default_start = max(min_date, current_year_start)
-                default_end = max_date
-            elif preset_range.isdigit():  # Individual year selection
-                selected_year = int(preset_range)
-                year_start = pd.Timestamp(selected_year, 1, 1).date()
-                year_end = pd.Timestamp(selected_year, 12, 31).date()
-                default_start = max(min_date, year_start)
-                default_end = min(max_date, year_end)
-            else:  # Custom Range
-                default_start, default_end = min_date, max_date
-            
-            with col2:
-                # Custom date range selector (always shown but populated based on preset)
-                date_range = st.date_input(
-                    "📆 Custom Date Range" if preset_range == "Custom Range" else "📆 Selected Range",
-                    value=(default_start, default_end),
-                    min_value=min_date,
-                    max_value=max_date,
-                    disabled=(preset_range != "Custom Range"),
-                    key="main_date_range"
-                )
-            
-            with col3:
-                # Show selected date range info
-                if len(date_range) == 2:
-                    total_days = (date_range[1] - date_range[0]).days + 1
-                    st.info(f"📊 **{total_days} days** selected\n\n{date_range[0]} to {date_range[1]}")
-            
-            # Artist filter in a separate row
-            st.markdown("##### 🎤 Artist Filter")
-            top_artists = df['artist_name'].value_counts().head(20).index.tolist()
-            selected_artists = st.multiselect(
-                "Filter by Top Artists (optional)",
-                top_artists,
-                key="main_artist_filter",
-                help="Select one or more artists to focus your analysis"
-            )
-        
-        # Filter data based on date range
-        if len(date_range) == 2:
-            start_date, end_date = date_range
-            df_filtered = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
-        else:
-            df_filtered = df
-        
-        # Apply artist filter
-        if selected_artists:
-            df_filtered = df_filtered[df_filtered['artist_name'].isin(selected_artists)]
-        
+        # Use all data without filters
+        df_filtered = df
 
         
         # Add chat interface to sidebar if enabled
@@ -1347,128 +1616,10 @@ print(f"{track}: {hours:.1f} hours, {plays} plays")
             with st.sidebar:
                 create_chat_interface(df, df_filtered)
         
-        st.markdown("---")
+
         
-        # Display overview metrics
-        create_overview_metrics(df_filtered)
-        st.markdown("---")
-        
-        # Add track analysis debugging tool
-        with st.expander("🔍 Track Analysis Debug Tool"):
-            st.write("**Search for track variations and duplicates:**")
-            search_term = st.text_input("Enter part of a track or artist name:", key="track_search")
-            if search_term:
-                # Search in both original and cleaned names
-                matches = df[
-                    df['track_name'].str.contains(search_term, case=False, na=False) |
-                    df['artist_name'].str.contains(search_term, case=False, na=False) |
-                    df['track_name_raw'].str.contains(search_term, case=False, na=False) |
-                    df['artist_name_raw'].str.contains(search_term, case=False, na=False)
-                ]
-                
-                if len(matches) > 0:
-                    # Show track statistics
-                    track_stats = matches.groupby('track_artist').agg({
-                        'hours_played': 'sum',
-                        'track_name_raw': 'unique',
-                        'artist_name_raw': 'unique'
-                    }).sort_values('hours_played', ascending=False)
-                    
-                    st.write(f"**Found {len(track_stats)} matching tracks:**")
-                    for track_artist, row in track_stats.head(10).iterrows():
-                        st.write(f"**{track_artist}** - {row['hours_played']:.1f} hours")
-                        if len(row['track_name_raw']) > 1 or len(row['artist_name_raw']) > 1:
-                            track_vars = list(row['track_name_raw'])
-                            artist_vars = list(row['artist_name_raw'])
-                            st.write(f"   Original variations: Track: {track_vars}, Artist: {artist_vars}")
-                else:
-                    st.write("No matches found.")
-            
-            # Add detailed comparison tool
-            st.markdown("---")
-            st.write("**🔍 Detailed Track Analysis:**")
-            st.write("Search for a specific track to see ALL data entries and why results might differ:")
-            
-            specific_search = st.text_input("Enter exact track name (e.g., 'Reelin'):", key="specific_search")
-            if specific_search:
-                # Find all entries for this track
-                specific_matches = df[
-                    df['track_name'].str.contains(specific_search, case=False, na=False) |
-                    df['track_name_raw'].str.contains(specific_search, case=False, na=False)
-                ]
-                
-                if len(specific_matches) > 0:
-                    st.write(f"**Found {len(specific_matches)} individual plays matching '{specific_search}':**")
-                    
-                    # Show raw data breakdown
-                    raw_breakdown = specific_matches.groupby(['track_name_raw', 'artist_name_raw']).agg({
-                        'hours_played': ['sum', 'count'],
-                        'track_name': 'first',
-                        'artist_name': 'first',
-                        'track_artist': 'first'
-                    }).round(2)
-                    
-                    st.write("**Raw Data Breakdown (before cleaning):**")
-                    for (track_raw, artist_raw), row in raw_breakdown.iterrows():
-                        hours = row[('hours_played', 'sum')]
-                        plays = row[('hours_played', 'count')]
-                        cleaned_track = row[('track_name', 'first')]
-                        cleaned_artist = row[('artist_name', 'first')]
-                        track_artist = row[('track_artist', 'first')]
-                        
-                        st.write(f"**Original**: \"{track_raw}\" by \"{artist_raw}\"")
-                        st.write(f"   → **Cleaned to**: {track_artist}")
-                        st.write(f"   → **Stats**: {hours:.1f} hours, {plays} plays")
-                        st.write("")
-                    
-                    # Show final consolidated stats
-                    consolidated = specific_matches.groupby('track_artist').agg({
-                        'hours_played': 'sum',
-                        'ms_played': 'count'
-                    }).round(2)
-                    
-                    st.write("**Final Consolidated Results (what both dashboard and Gemini should show):**")
-                    for track_artist, row in consolidated.iterrows():
-                        hours = row['hours_played']
-                        plays = row['ms_played']
-                        st.write(f"🎵 **{track_artist}**: {hours:.1f} hours, {plays} plays")
-                    
-                    # Show what Gemini should use
-                    st.markdown("---")
-                    st.code(f"""
-# What Gemini should use for accurate results:
-top_tracks = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
-# For '{specific_search}', this should return: {consolidated.iloc[0]['hours_played']:.1f} hours
-                    """, language="python")
-                    
-                else:
-                    st.write("No matches found.")
-        
-        st.markdown("---")
-        
-        # Create visualizations
-        create_listening_timeline(df_filtered)
-        st.markdown("---")
-        
-        create_top_artists_tracks(df_filtered)
-        st.markdown("---")
-        
-        create_listening_patterns(df_filtered)
-        st.markdown("---")
-        
-        create_time_based_analysis(df_filtered)
-        st.markdown("---")
-        
-        create_discovery_analysis(df_filtered)
-        st.markdown("---")
-        
-        create_skip_analysis(df_filtered)
-        st.markdown("---")
-        
-        create_stacked_area_charts(df_filtered)
-        st.markdown("---")
-        
-        create_artist_wordcloud(df_filtered)
+        # Create the new timeline visualizations with tabs
+        create_period_timeline_with_tabs(df_filtered)
         
         # Data Export Section
         st.markdown("---")
