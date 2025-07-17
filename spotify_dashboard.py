@@ -27,7 +27,161 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Default Streamlit styling (no custom CSS)
+# Custom CSS for modern, clean design
+st.markdown("""
+<style>
+    /* Hide default Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display:none;}
+    
+    /* Main container styling */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: none;
+    }
+    
+    /* Typography improvements */
+    .stMarkdown h1 {
+        color: #1f2937;
+        font-weight: 700;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 3px solid #310134;
+        padding-bottom: 0.5rem;
+    }
+    
+    .stMarkdown h2 {
+        color: #374151;
+        font-weight: 600;
+        font-size: 1.8rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+    
+    .stMarkdown h3 {
+        color: #4b5563;
+        font-weight: 600;
+        font-size: 1.4rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    /* Card-like containers */
+    div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column"] {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 1rem;
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        padding: 1rem;
+    }
+    
+    /* Button improvements */
+    .stButton > button {
+        background: linear-gradient(135deg, #310134 0%, #4a1458 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 0.6rem 1.2rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(49, 1, 52, 0.3);
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #4a1458 0%, #310134 100%);
+        box-shadow: 0 4px 8px rgba(49, 1, 52, 0.4);
+        transform: translateY(-1px);
+    }
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 4px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        border-radius: 6px;
+        background: transparent;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Selectbox improvements */
+    .stSelectbox > div > div {
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        transition: border-color 0.3s ease;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #310134;
+        box-shadow: 0 0 0 3px rgba(49, 1, 52, 0.1);
+    }
+    
+    /* Metric styling */
+    [data-testid="metric-container"] {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid #e5e7eb;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    /* Success/Info message improvements */
+    .stSuccess, .stInfo {
+        border-radius: 8px;
+        border-left: 4px solid #310134;
+    }
+    
+    /* Dataframe styling */
+    .stDataFrame {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Spacing improvements */
+    .element-container {
+        margin-bottom: 1rem;
+    }
+    
+    /* Charts container */
+    .js-plotly-plot {
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Upload widget styling */
+    .stFileUploader > div {
+        border: 2px dashed #310134;
+        border-radius: 8px;
+        background: #faf8ff;
+        transition: all 0.3s ease;
+    }
+    
+    .stFileUploader > div:hover {
+        border-color: #4a1458;
+        background: #f5f0ff;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Initialize session state for chat
 if "chat_messages" not in st.session_state:
@@ -557,9 +711,34 @@ def create_treemap_chart(period_data, period, content_type, color_scheme='blues'
 
 def create_period_timeline_with_tabs(df):
     """Create the new timeline interface with content selector and tabs"""
-    st.header("📈 Timeline Analysis: Your Music Through Time")
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #310134 0%, #4a1458 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 16px rgba(49, 1, 52, 0.2);
+    ">
+        <h1 style="
+            color: white;
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 0;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        ">📈 Timeline Analysis: Your Music Through Time</h1>
+        <p style="
+            color: rgba(255,255,255,0.9);
+            font-size: 1.1rem;
+            text-align: center;
+            margin: 0.5rem 0 0 0;
+            font-weight: 400;
+        ">Discover patterns in your listening habits across different time periods</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Content type and period selectors
+    
     col1, col2 = st.columns([1, 1])
     
     with col1:
@@ -571,7 +750,8 @@ def create_period_timeline_with_tabs(df):
                 'tracks': '🎵 Tracks', 
                 'albums': '💿 Albums'
             }[x],
-            key="content_type_selector"
+            key="content_type_selector",
+            help="Choose what type of content to analyze in your timelines"
         )
     
     with col2:
@@ -584,7 +764,8 @@ def create_period_timeline_with_tabs(df):
         selected_period = st.selectbox(
             "📅 Time Period Granularity",
             options=period_options,
-            key="main_period_type"
+            key="main_period_type",
+            help="Select yearly view or monthly breakdown for a specific year"
         )
     
     # Determine period type and year filter
@@ -606,8 +787,7 @@ def create_period_timeline_with_tabs(df):
         st.warning("No data available for the selected time period")
         return
     
-    # Display summary info
-    st.write(f"**Found {len(periods)} time periods** from **{periods[0]}** to **{periods[-1]}**")
+    # Summary info removed per user request
     
     # Create tabs for All Music vs Period-Specific Discovery
     tab1, tab2 = st.tabs(["🎵 All Music", "🔍 Period-Specific Discovery"])
@@ -1694,12 +1874,27 @@ def main():
         st.markdown("---")
         
         # Chat interface is always enabled
-        st.markdown("### 🤖 AI Chat")
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #310134 0%, #4a1458 100%);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: center;
+        ">
+            <h3 style="
+                color: white;
+                margin: 0;
+                font-size: 1.1rem;
+                font-weight: 600;
+                text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            ">🤖 AI Music Analyst</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         st.markdown("---")
     
-    # Header
-    st.title("🎵 Spotify Listening History Dashboard")
+    # Main dashboard content starts here
     
     # Robust session state management - prioritize existing data
     try:
@@ -1785,8 +1980,29 @@ def main():
         create_period_timeline_with_tabs(df_filtered)
         
         # Data Export Section
-        st.markdown("---")
-        st.subheader("💾 Export Data")
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            border: 1px solid #cbd5e1;
+        ">
+            <h2 style="
+                color: #334155;
+                font-size: 1.8rem;
+                font-weight: 700;
+                margin: 0 0 0.5rem 0;
+                text-align: center;
+            ">💾 Export Your Data</h2>
+            <p style="
+                color: #64748b;
+                text-align: center;
+                margin: 0;
+                font-size: 1rem;
+            ">Download your analyzed listening history in various formats</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Create export options
         col1, col2 = st.columns(2)
