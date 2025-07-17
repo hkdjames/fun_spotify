@@ -211,7 +211,7 @@ def setup_gemini_api():
     except Exception as e:
         return None, f"Error setting up Gemini API: {str(e)}"
 
-def get_data_context(df, df_filtered, is_filtered):
+def get_data_context(df):
     """Generate data context for the AI"""
     
     # Calculate top tracks using the exact same method as dashboard
@@ -224,18 +224,15 @@ def get_data_context(df, df_filtered, is_filtered):
     context = {
         "dataset_info": {
             "total_records": len(df),
-            "filtered_records": len(df_filtered) if is_filtered else len(df),
             "date_range": f"{df['ts'].min().strftime('%Y-%m-%d')} to {df['ts'].max().strftime('%Y-%m-%d')}",
-            "columns": list(df.columns),
-            "is_filtered": is_filtered
+            "columns": list(df.columns)
         },
         "summary_stats": {
-            "total_hours": float(df_filtered['hours_played'].sum()),
-            "total_plays": len(df_filtered),
-            "unique_artists": df_filtered['artist_name'].nunique(),
-            "unique_tracks": df_filtered['track_name'].nunique(),
-            "date_range_filtered": f"{df_filtered['ts'].min().strftime('%Y-%m-%d')} to {df_filtered['ts'].max().strftime('%Y-%m-%d')}" if len(df_filtered) > 0 else "No data",
-            "top_artists": df_filtered['artist_name'].value_counts().head(10).to_dict(),
+            "total_hours": float(df['hours_played'].sum()),
+            "total_plays": len(df),
+            "unique_artists": df['artist_name'].nunique(),
+            "unique_tracks": df['track_name'].nunique(),
+            "top_artists": df['artist_name'].value_counts().head(10).to_dict(),
             "top_tracks_correct": top_tracks_dict  # EXACT results using track_artist method
         }
     }
@@ -246,12 +243,10 @@ def create_system_prompt(data_context):
     return f"""You are a Spotify listening data analyst with FULL ACCESS to powerful data analysis tools. You have complete access to a Spotify streaming history dataset and can perform ANY data analysis requested.
 
 DATASET ACCESS:
-- **df_filtered**: Currently filtered dataset ({data_context['dataset_info']['filtered_records']:,} records)
-- **df_full**: Complete unfiltered dataset ({data_context['dataset_info']['total_records']:,} records)
-- **Full date range**: {data_context['dataset_info']['date_range']}
-- **Current filter**: {'Applied' if data_context['dataset_info']['is_filtered'] else 'No filters applied'}
+- **df**: Complete dataset ({data_context['dataset_info']['total_records']:,} records)
+- **Date range**: {data_context['dataset_info']['date_range']}
 
-CURRENT DATA SUMMARY (FILTERED):
+CURRENT DATA SUMMARY:
 - Total listening hours: {data_context['summary_stats']['total_hours']:.1f}
 - Total plays: {data_context['summary_stats']['total_plays']:,}
 - Unique artists: {data_context['summary_stats']['unique_artists']:,}
@@ -338,7 +333,7 @@ CRITICAL INSTRUCTIONS:
 3. **PLAYFUL TONE**: Be conversational, fun, and engaging
 4. **NO TECHNICAL LANGUAGE**: Avoid words like "requires", "accessing", "determining", "data analysis"
 5. **JUST THE FACTS**: Give specific numbers and insights without explaining how you got them
-6. **USE df_full BY DEFAULT**, switch to df_filtered for questions where it's important to use the filtered dataset
+6. **USE df BY DEFAULT** for all analysis - this contains your complete Spotify listening history
 7. **NO CODE OR CHARTS**: Never generate visualizations or show code
 8. **DEFAULT TO LISTENING TIME RATHER THAN PLAYS** when asked for top artists, tracks or trends default to listening time.
 9. **USE TRACK_ARTIST FIELD**: Always use 'track_artist' for track analysis, never 'track_name' alone
@@ -356,19 +351,18 @@ RESPONSE STYLE:
 
 CORE RULE: Jump straight to the fun insights with real numbers. Be enthusiastic and conversational. NO methodology talk unless explicitly asked to show work!"""
 
-def execute_ai_code(code, df_filtered, df_full=None):
+def execute_ai_code(code, df):
     """Safely execute AI-generated code"""
     try:
         # Pre-compute common analysis results to prevent undefined variable errors
-        top_tracks_by_hours = df_full.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False) if df_full is not None else None
-        top_artists_by_hours = df_full.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False) if df_full is not None else None
+        top_tracks_by_hours = df.groupby('track_artist')['hours_played'].sum().sort_values(ascending=False)
+        top_artists_by_hours = df.groupby('artist_name')['hours_played'].sum().sort_values(ascending=False)
         all_tracks = top_tracks_by_hours  # Alias for compatibility
         all_artists = top_artists_by_hours  # Alias for compatibility
         
         # Create a restricted namespace with pre-computed helpers
         namespace = {
-            'df_filtered': df_filtered,
-            'df_full': df_full,
+            'df': df,
             'pd': pd,
             'px': px,
             'go': go,
@@ -415,10 +409,10 @@ def clean_artist_name(artist_name):
     
     return cleaned
 
-def create_chat_interface(df, df_filtered):
+def create_chat_interface(df):
     """Create the chat interface in sidebar"""
     # Check if data context has changed
-    current_hash = hash(str(df_filtered.shape) + str(df_filtered['ts'].min()) + str(df_filtered['ts'].max()))
+    current_hash = hash(str(df.shape) + str(df['ts'].min()) + str(df['ts'].max()))
     context_changed = st.session_state.data_context_hash != current_hash
     
     if context_changed:
@@ -428,8 +422,8 @@ def create_chat_interface(df, df_filtered):
             st.session_state.chat_messages.append({
                 "role": "assistant",
                 "content": "📊 **Data context updated** - I'm now analyzing your filtered dataset with " + 
-                          f"{len(df_filtered):,} records from {df_filtered['ts'].min().strftime('%Y-%m-%d')} to " +
-                          f"{df_filtered['ts'].max().strftime('%Y-%m-%d')}" if len(df_filtered) > 0 else "No data in current filter."
+                                  f"{len(df):,} records from {df['ts'].min().strftime('%Y-%m-%d')} to " +
+        f"{df['ts'].max().strftime('%Y-%m-%d')}" if len(df) > 0 else "No data available."
             })
     
     st.markdown("### 🤖 Ask About Your Music Data")
@@ -516,7 +510,7 @@ GEMINI_API_KEY = "your-api-key-here"</code></pre>
         with st.spinner("🤖 Analyzing your data..."):
             try:
                 # Get data context
-                data_context = get_data_context(df, df_filtered, is_filtered)
+                data_context = get_data_context(df)
                 system_prompt = create_system_prompt(data_context)
                 
                 # Create conversation history for context
@@ -1984,18 +1978,14 @@ def main():
                     if quality_info['duplicates_detected'] > 5:
                         st.write(f"... +{quality_info['duplicates_detected'] - 5} more")
         
-        # Use all data without filters
-        df_filtered = df
-
-        
         # Add chat interface to sidebar (always enabled)
         with st.sidebar:
-            create_chat_interface(df, df_filtered)
+            create_chat_interface(df)
         
 
         
         # Create the new timeline visualizations with tabs
-        create_period_timeline_with_tabs(df_filtered)
+        create_period_timeline_with_tabs(df)
         
         # Data Export Section
         st.markdown("""
@@ -2058,41 +2048,16 @@ def main():
                 st.info("📝 Install openpyxl to enable Excel download: `pip install openpyxl`")
         
         with col2:
-            st.markdown("**🎯 Filtered Dataset**")
-            st.write(f"Filtered records: {len(df_filtered):,}")
-            if len(df_filtered) > 0:
-                st.write(f"Date range: {df_filtered['ts'].min().strftime('%Y-%m-%d')} to {df_filtered['ts'].max().strftime('%Y-%m-%d')}")
+            st.markdown("**📊 Data Preview**")
+            st.write("Quick preview of your listening data:")
             
-            # Convert filtered dataframe to CSV
-            csv_filtered = df_filtered.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Filtered Data (CSV)",
-                data=csv_filtered,
-                file_name=f"spotify_filtered_data_{df_filtered['ts'].min().strftime('%Y%m%d') if len(df_filtered) > 0 else 'empty'}_{df_filtered['ts'].max().strftime('%Y%m%d') if len(df_filtered) > 0 else 'empty'}.csv",
-                mime="text/csv",
-                help="Download currently filtered data as CSV file",
-                disabled=(len(df_filtered) == 0)
-            )
-            
-            # Convert filtered data to Excel
-            try:
-                if len(df_filtered) > 0:
-                    buffer_filtered = io.BytesIO()
-                    with pd.ExcelWriter(buffer_filtered, engine='openpyxl') as writer:
-                        df_filtered.to_excel(writer, sheet_name='Filtered_Data', index=False)
-                        
-                    excel_filtered = buffer_filtered.getvalue()
-                    st.download_button(
-                        label="📥 Download Filtered Data (Excel)",
-                        data=excel_filtered,
-                        file_name=f"spotify_filtered_data_{df_filtered['ts'].min().strftime('%Y%m%d')}_{df_filtered['ts'].max().strftime('%Y%m%d')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        help="Download currently filtered data as Excel file"
-                    )
-                else:
-                    st.button("📥 Download Filtered Data (Excel)", disabled=True, help="No data available with current filters")
-            except ImportError:
-                st.info("📝 Install openpyxl to enable Excel download: `pip install openpyxl`")
+            # Show preview of the data
+            if len(df) > 0:
+                st.dataframe(
+                    df[['ts', 'track_name', 'artist_name', 'album_name', 'minutes_played']].head(5),
+                    use_container_width=True,
+                    hide_index=True
+                )
         
         # Additional export options
         st.markdown("**📋 Data Columns Included:**")
@@ -2108,7 +2073,7 @@ def main():
         # Data table
         if st.checkbox("Show Raw Data"):
             st.subheader("📊 Raw Data")
-            st.dataframe(df_filtered[['ts', 'track_name', 'artist_name', 'album_name', 'minutes_played', 'skipped']].head(1000))
+            st.dataframe(df[['ts', 'track_name', 'artist_name', 'album_name', 'minutes_played', 'skipped']].head(1000))
         
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
