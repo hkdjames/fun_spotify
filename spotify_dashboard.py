@@ -631,12 +631,14 @@ def calculate_period_specific_trends(df, dominant_artists, dominant_tracks, peri
         # Albums (less likely to be dominant, so lighter filtering)
         period_albums = period_df_filtered.groupby(['album_name', 'artist_name'])['hours_played'].sum().sort_values(ascending=False).head(10)
         
+        # Use the most restrictive filtering (artist-based) for total calculations
+        # This gives the most accurate representation of what's left after exclusions
         filtered_period_data[period] = {
             'artists': [(name, hours) for name, hours in period_artists.items()],
             'tracks': [(name, hours) for name, hours in period_tracks.items()],
             'albums': [(f"{album} - {artist}", hours) for (album, artist), hours in period_albums.items()],
-            'total_hours': period_df['hours_played'].sum(),
-            'total_plays': len(period_df)
+            'total_hours': period_df_filtered['hours_played'].sum(),
+            'total_plays': len(period_df_filtered)
         }
     
     return filtered_period_data, periods
@@ -789,10 +791,15 @@ def create_period_timeline_with_tabs(df):
     
     # Summary info removed per user request
     
-    # Create tabs for All Music vs Period-Specific Discovery
-    tab1, tab2 = st.tabs(["🎵 All Music", "🔍 Period-Specific Discovery"])
+    # Create tab selector that preserves state when widgets change
+    tab_selection = st.radio(
+        "📊 Analysis Mode",
+        options=["🎵 All Music", "🔍 Period-Specific Discovery"],
+        horizontal=True,
+        key="tab_selector"
+    )
     
-    with tab1:
+    if tab_selection == "🎵 All Music":
         st.subheader(f"Top {content_type.title()} by Time Period")
         st.write("*Showing your most listened to content for each time period*")
         
@@ -820,7 +827,7 @@ def create_period_timeline_with_tabs(df):
             
             st.markdown("---")
     
-    with tab2:
+    elif tab_selection == "🔍 Period-Specific Discovery":
         st.subheader(f"Period-Specific {content_type.title()} Discovery")
         st.write("*Showing content that was uniquely popular in specific time periods*")
         
@@ -845,6 +852,9 @@ def create_period_timeline_with_tabs(df):
         with st.spinner("Identifying period-specific trends..."):
             dominant_artists, dominant_tracks = identify_dominant_content(df_period, exclusion_depth, period_type)
             filtered_period_data, _ = calculate_period_specific_trends(df_period, dominant_artists, dominant_tracks, period_type)
+            
+            # Calculate original period data for exclusion percentage comparison
+            original_period_data, _ = calculate_period_stats(df_period, period_type)
         
         # Show what's being excluded
         with st.expander(f"🚫 Excluded Content (Top {exclusion_depth} Dominant)"):
@@ -903,6 +913,14 @@ def create_period_timeline_with_tabs(df):
                 with col2:
                     st.metric("Total Hours", f"{total_hours:.1f}")
                     st.metric("Total Plays", f"{total_plays:,}")
+                    
+                    # Calculate exclusion percentage
+                    if period in original_period_data:
+                        original_hours = original_period_data[period]['total_hours']
+                        excluded_hours = original_hours - total_hours
+                        exclusion_percentage = (excluded_hours / original_hours * 100) if original_hours > 0 else 0
+                        st.metric("Excluded Hours", f"{exclusion_percentage:.1f}%", 
+                                help=f"{excluded_hours:.1f} of {original_hours:.1f} total hours excluded")
                 
                 with col1:
                     # Create treemap chart for this period (orange color scheme)
